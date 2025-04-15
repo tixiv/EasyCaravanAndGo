@@ -1,0 +1,15 @@
+# ========== Visual Studio ==========
+.vs/
+*.csproj.user
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# ========== Build Output ==========
+bin/
+obj/
+
+Assemblies/
+packages/
+

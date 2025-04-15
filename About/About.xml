@@ -1,0 +1,30 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ModMetaData>
+    <name>Easy Caravan and go!</name>
+    <author>Tixiv</author>
+    <url>https://github.com/tixiv/EasyCaravanAndGo</url>
+    <packageId>Tixiv.EasyCaravanAndGo</packageId>
+    <supportedVersions>
+        <li>1.5</li>
+    </supportedVersions>
+<description>
+A quality of life mod for Rimworld. Have you ever gotten sick of needing to click through the world, remember the pawn you wanted to use, and then form a caravan, just to collect some stuff at the edge of your map?
+
+Ever had a different playstile, and wanted to quickly abandon the colony into a caravan, but everyone would run right into the enemies or wait around when forming it?
+
+This mod helps with these problem! When any colonist is drafted you now have a button to start forming a caravan immediately! No selecting where to go or what to take! Just "add to caravan" the items that you want and go! When a colonist is forming the caravan, if you draft them you now get the option to click on a map edge to have them leave there and form the carava. Colonists need to leave in different directions? No Problem! Just merge your caravans once they are on the world (and of course tell them where to go now).
+
+</description>
+    <modDependencies>
+        <li>
+            <packageId>brrainz.harmony</packageId>
+            <displayName>Harmony</displayName>
+            <downloadUrl>https://github.com/pardeike/HarmonyRimWorld</downloadUrl>
+            <steamWorkshopUrl>https://steamcommunity.com/sharedfiles/filedetails/?id=2009463077</steamWorkshopUrl>
+        </li>
+    </modDependencies>
+    <loadAfter>
+        <li>brrainz.harmony</li>
+        <li>Ludeon.RimWorld</li>
+    </loadAfter>
+</ModMetaData>
