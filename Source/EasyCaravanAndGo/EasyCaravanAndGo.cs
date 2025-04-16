@@ -26,6 +26,8 @@ namespace EasyCaravanAndGo
             harmony.Patch(AccessTools.Method(typeof(LordJob_FormAndSendCaravan), nameof(LordJob_FormAndSendCaravan.CreateGraph)),
                 postfix: new HarmonyMethod(typeof(EasyCaravanAndGo), nameof(EasyCaravanAndGo.CreateGraph_Postfix))
             );
+
+            harmony.PatchAll();
         }
 
         public static IntVec3? TryFindExitSpot(Map map, List<Pawn> pawns, int startingTile)
@@ -86,7 +88,7 @@ namespace EasyCaravanAndGo
                 newGizmos.Add(new Command_Action
                 {
                     defaultLabel = "Caravan Leave",
-                    defaultDesc = "Select a spot at the edge of the map where the caravan should leave now",
+                    defaultDesc = "Force the caravan to leave now.",
                     icon = TexCommand.Attack,
                     action = () =>
                     {
@@ -182,16 +184,16 @@ namespace EasyCaravanAndGo
                 if (field != null)
                 {
                     field.SetValue(toilsToPatch.gatherDownedPawns, exitSpot);
-                    Log.Message($"✅ Patched 'gatherDownedPawns.exitSpot' to {exitSpot}");
+                    Log.Message($"Patched 'gatherDownedPawns.exitSpot' to {exitSpot}");
                 }
                 else
                 {
-                    Log.Warning("⚠️ Field 'exitSpot' not found in LordToil_PrepareCaravan_GatherDownedPawns");
+                    Log.Warning("Field 'exitSpot' not found in LordToil_PrepareCaravan_GatherDownedPawns");
                 }
             }
             else
             {
-                Log.Warning("⚠️ toilsToPatch.gatherDownedPawns is null");
+                Log.Warning("toilsToPatch.gatherDownedPawns is null");
             }
 
             if (toilsToPatch.collectAnimals != null)
@@ -200,16 +202,16 @@ namespace EasyCaravanAndGo
                 if (field != null)
                 {
                     field.SetValue(toilsToPatch.collectAnimals, exitSpot);
-                    Log.Message($"✅ Patched 'collectAnimals.destinationPoint' to {exitSpot}");
+                    Log.Message($"Patched 'collectAnimals.destinationPoint' to {exitSpot}");
                 }
                 else
                 {
-                    Log.Warning("⚠️ Field 'destinationPoint' not found in LordToil_PrepareCaravan_CollectAnimals");
+                    Log.Warning("Field 'destinationPoint' not found in LordToil_PrepareCaravan_CollectAnimals");
                 }
             }
             else
             {
-                Log.Warning("⚠️ toilsToPatch.collectAnimals is null");
+                Log.Warning("toilsToPatch.collectAnimals is null");
             }
 
             if (toilsToPatch.leave != null)
@@ -218,16 +220,16 @@ namespace EasyCaravanAndGo
                 if (field != null)
                 {
                     field.SetValue(toilsToPatch.leave, exitSpot);
-                    Log.Message($"✅ Patched 'leave.exitSpot' to {exitSpot}");
+                    Log.Message($"Patched 'leave.exitSpot' to {exitSpot}");
                 }
                 else
                 {
-                    Log.Warning("⚠️ Field 'exitSpot' not found in LordToil_PrepareCaravan_Leave");
+                    Log.Warning("Field 'exitSpot' not found in LordToil_PrepareCaravan_Leave");
                 }
             }
             else
             {
-                Log.Warning("⚠️ toilsToPatch.leave is null");
+                Log.Warning("toilsToPatch.leave is null");
             }
         }
 
@@ -235,7 +237,7 @@ namespace EasyCaravanAndGo
         {
             // 🧠 Your logic here: add stuff to the graph
             // Example:
-            Log.Message("🧩 Adding node to the StateGraph...");
+            Log.Message("Adding node to the StateGraph...");
 
             LordToil                                  gatherAnimals     = __result.lordToils.OfType<LordToil_PrepareCaravan_GatherAnimals>().FirstOrDefault();
             LordToil                                  gatherItems       = __result.lordToils.OfType<LordToil_PrepareCaravan_GatherItems>().FirstOrDefault();
@@ -266,6 +268,15 @@ namespace EasyCaravanAndGo
                 }
             }
 
+            if (leave != null && gatherItems != null)
+            {
+                {
+                    Transition transition = new Transition(leave, gatherItems);
+                    transition.AddTrigger(new Trigger_Memo("CaravanBackToPacking"));
+                    __result.AddTransition(transition);
+                }
+            }
+
             if (gatherDownedPawns != null)
                 toilsToPatch.gatherDownedPawns = gatherDownedPawns;
 
@@ -276,6 +287,21 @@ namespace EasyCaravanAndGo
                 toilsToPatch.leave = leave;
 
         }
+
+        public static void daFloatMenuePatch(Pawn pawn, JobDef myJob, Pawn targetAnimal)
+        {
+
+            // MyDefOf.LoadOntoAnimal
+
+            JobDriver_PrepareCaravan_GatherItems.IsUsableCarrier(targetAnimal, pawn, true);
+
+            FloatMenuOption option = new FloatMenuOption("Load items onto pack animal", () =>
+            {
+                Job job = JobMaker.MakeJob(myJob, targetAnimal);
+                pawn.jobs.TryTakeOrderedJob(job);
+            });
+        }
+
 
         public static readonly Texture2D AddToCaravanCommand = ContentFinder<Texture2D>.Get("UI/Commands/AddToCaravan", true);
     }

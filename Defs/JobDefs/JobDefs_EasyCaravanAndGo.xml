@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Defs>
+  <JobDef>
+    <defName>PackInventoryOnCaravanAnimal</defName>
+    <driverClass>EasyCaravanAndGo.JobDriver_PackInventoryOnCaravanAnimal</driverClass>
+    <reportString>Packing inventory onto caravan animal.</reportString>
+    <playerInterruptible>true</playerInterruptible>
+    <casualInterruptible>true</casualInterruptible>
+    <alwaysShowWeapon>false</alwaysShowWeapon>
+  </JobDef>
+</Defs>
