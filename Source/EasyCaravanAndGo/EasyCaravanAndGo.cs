@@ -10,6 +10,9 @@ using RimWorld;
 using Verse;
 using Verse.AI.Group;
 using Verse.AI;
+using System.Reflection.Emit;
+using System.Reflection;
+using System.Collections;
 
 namespace EasyCaravanAndGo
 {
@@ -24,8 +27,7 @@ namespace EasyCaravanAndGo
                 postfix: new HarmonyMethod(typeof(EasyCaravanAndGo), nameof(EasyCaravanAndGo.GetGizmos_Postfix)));
 
             harmony.Patch(AccessTools.Method(typeof(LordJob_FormAndSendCaravan), nameof(LordJob_FormAndSendCaravan.CreateGraph)),
-                postfix: new HarmonyMethod(typeof(EasyCaravanAndGo), nameof(EasyCaravanAndGo.CreateGraph_Postfix))
-            );
+                postfix: new HarmonyMethod(typeof(EasyCaravanAndGo), nameof(EasyCaravanAndGo.CreateGraph_Postfix)));
 
             harmony.PatchAll();
         }
@@ -40,17 +42,12 @@ namespace EasyCaravanAndGo
             // set the private 'startingTile'
             AccessTools.Field(typeof(Dialog_FormCaravan), "startingTile").SetValue(fakeDialog, startingTile);
 
-            var method = AccessTools.Method(
-                typeof(Dialog_FormCaravan),
-                "TryFindExitSpot",
-                new Type[] { typeof(List<Pawn>), typeof(bool), typeof(IntVec3).MakeByRefType() }
-            );
+            var method = AccessTools.Method(typeof(Dialog_FormCaravan), "TryFindExitSpot",
+                new Type[] { typeof(List<Pawn>), typeof(bool), typeof(IntVec3).MakeByRefType() });
 
             object[] parameters = new object[] { pawns, true, null }; // null for the out parameter
 
-            bool result = (bool)method.Invoke(fakeDialog, parameters);
-
-            if (!result)
+            if (!(bool)method.Invoke(fakeDialog, parameters))
                 return null;
 
             return (IntVec3)parameters[2]; // out parameter is modified in-place
@@ -66,7 +63,24 @@ namespace EasyCaravanAndGo
                     Map map = target.Map;
                     IntVec3 cell = target.Cell;
 
-                    if (!cell.IsValid || !cell.InBounds(map)|| !cell.Walkable(map) || cell.Fogged(map)|| !cell.OnEdge(map))
+                    if (!cell.IsValid || !cell.InBounds(map) || !cell.Walkable(map) || cell.Fogged(map) || !cell.OnEdge(map))
+                        return false;
+
+                    return true;
+                }
+            };
+        }
+        public static TargetingParameters CaravanPackingTargetParams()
+        {
+            return new TargetingParameters
+            {
+                canTargetLocations = true,
+                validator = (TargetInfo target) =>
+                {
+                    Map map = target.Map;
+                    IntVec3 cell = target.Cell;
+
+                    if (!cell.IsValid || !cell.InBounds(map) || !cell.Walkable(map) || cell.Fogged(map))
                         return false;
 
                     return true;
@@ -83,7 +97,7 @@ namespace EasyCaravanAndGo
 
             var lord = pawn.GetLord();
 
-            if (lord != null && lord.LordJob is LordJob_FormAndSendCaravan lj)
+            if (lord != null && lord.LordJob is LordJob_FormAndSendCaravan lordJob)
             {
                 newGizmos.Add(new Command_Action
                 {
@@ -100,7 +114,7 @@ namespace EasyCaravanAndGo
                 {
                     defaultLabel = "Select Exit Cell",
                     defaultDesc = "Choose a location on the edge of the map where the caravan should exit.",
-                    icon = TexCommand.Attack, // You can customize this
+                    icon = TexCommand.Attack,
                     action = () =>
                     {
                         TargetingParameters targetParams = CaravanExitTargetParams();
@@ -112,8 +126,21 @@ namespace EasyCaravanAndGo
                             Messages.Message("Caravan exit set to " + exitSpot, MessageTypeDefOf.PositiveEvent);
 
                             // Patch all the exit spots
-                            AccessTools.Field(typeof(LordJob_FormAndSendCaravan), "exitSpot").SetValue(lj, exitSpot);
-                            PatchToils(exitSpot);
+                            AccessTools.Field(typeof(LordJob_FormAndSendCaravan), "exitSpot").SetValue(lordJob, exitSpot);
+                            PatchToilsExitSpot(exitSpot);
+
+                            lord.ReceiveMemo("CaravanBackToGatherDownedPawns");
+
+                            /*
+                            foreach (Pawn p in lord.ownedPawns)
+                            {
+                                if (p.mindState.duty.def == DutyDefOf.PrepareCaravan_Wait ||
+                                    p.mindState.duty.def == DutyDefOf.PrepareCaravan_CollectAnimals)
+                                {
+                                    p.mindState.duty.focus = exitSpot;
+                                }
+                            }
+                            */
                         }
 
                         Find.Targeter.BeginTargeting(
@@ -126,6 +153,40 @@ namespace EasyCaravanAndGo
                         );
                     }
                 });
+
+                newGizmos.Add(new Command_Action
+                {
+                    defaultLabel = "Set Packing Spot",
+                    defaultDesc = "Update the packing spot for this caravan.",
+                    icon = TexCommand.Attack,
+                    action = () =>
+                    {
+                        TargetingParameters targetParams = CaravanPackingTargetParams();
+
+                        void action(LocalTargetInfo target)
+                        {
+                            IntVec3 packingSpot = target.Cell;
+
+                            Messages.Message("Caravan packing spot set to " + packingSpot, MessageTypeDefOf.PositiveEvent);
+
+                            // Patch all the packing spots
+                            AccessTools.Field(typeof(LordJob_FormAndSendCaravan), "meetingPoint").SetValue(lordJob, packingSpot);
+                            PatchToilsPackingSpot(packingSpot);
+
+                            lord.ReceiveMemo("CaravanBackToGatherAnimals");
+                        }
+
+                        Find.Targeter.BeginTargeting(
+                            targetParams,
+                            action,
+                            null,
+                            null,
+                            TexCommand.Attack, // or null for default
+                            true
+                        );
+                    }
+                });
+
 
             }
             else
@@ -168,7 +229,10 @@ namespace EasyCaravanAndGo
 
         public struct ToilsToPatch
         {
+            public LordToil_PrepareCaravan_GatherAnimals gatherAnimals;
+            public LordToil_PrepareCaravan_GatherItems gatherItems;
             public LordToil_PrepareCaravan_GatherDownedPawns gatherDownedPawns;
+            public LordToil_PrepareCaravan_Wait wait;
             public LordToil_PrepareCaravan_CollectAnimals collectAnimals;
             public LordToil_PrepareCaravan_Leave leave;
         }
@@ -176,134 +240,214 @@ namespace EasyCaravanAndGo
         // I might want to make this a Dictionary if multiple caravans are being formed, which is actually a usecase, ChatGpt, thanks for reminding me!
         public static ToilsToPatch toilsToPatch;
 
-        public static void PatchToils(IntVec3 exitSpot)
+
+        public static void patchSafe(object obj, Type type, string fieldName, IntVec3 value)
         {
-            if (toilsToPatch.gatherDownedPawns != null)
-            {
-                var field = AccessTools.Field(typeof(LordToil_PrepareCaravan_GatherDownedPawns), "exitSpot");
-                if (field != null)
-                {
-                    field.SetValue(toilsToPatch.gatherDownedPawns, exitSpot);
-                    Log.Message($"Patched 'gatherDownedPawns.exitSpot' to {exitSpot}");
-                }
-                else
-                {
-                    Log.Warning("Field 'exitSpot' not found in LordToil_PrepareCaravan_GatherDownedPawns");
-                }
-            }
-            else
-            {
-                Log.Warning("toilsToPatch.gatherDownedPawns is null");
-            }
 
-            if (toilsToPatch.collectAnimals != null)
+            if (obj != null)
             {
-                var field = AccessTools.Field(typeof(LordToil_PrepareCaravan_CollectAnimals), "destinationPoint");
+                var field = AccessTools.Field(type, fieldName);
                 if (field != null)
                 {
-                    field.SetValue(toilsToPatch.collectAnimals, exitSpot);
-                    Log.Message($"Patched 'collectAnimals.destinationPoint' to {exitSpot}");
+                    field.SetValue(obj, value);
+                    Log.Message($"Patched {type}.{fieldName} to {value}");
                 }
                 else
-                {
-                    Log.Warning("Field 'destinationPoint' not found in LordToil_PrepareCaravan_CollectAnimals");
-                }
+                    Log.Warning($"Field '{fieldName}' not found in {type}");
             }
             else
-            {
-                Log.Warning("toilsToPatch.collectAnimals is null");
-            }
+                Log.Warning($"{type} instance is null");
+        }
 
-            if (toilsToPatch.leave != null)
-            {
-                var field = AccessTools.Field(typeof(LordToil_PrepareCaravan_Leave), "exitSpot");
-                if (field != null)
-                {
-                    field.SetValue(toilsToPatch.leave, exitSpot);
-                    Log.Message($"Patched 'leave.exitSpot' to {exitSpot}");
-                }
-                else
-                {
-                    Log.Warning("Field 'exitSpot' not found in LordToil_PrepareCaravan_Leave");
-                }
-            }
-            else
-            {
-                Log.Warning("toilsToPatch.leave is null");
-            }
+        public static void PatchToilsExitSpot(IntVec3 exitSpot)
+        {
+            patchSafe(toilsToPatch.gatherDownedPawns, typeof(LordToil_PrepareCaravan_GatherDownedPawns), "exitSpot", exitSpot);
+            patchSafe(toilsToPatch.collectAnimals, typeof(LordToil_PrepareCaravan_CollectAnimals), "destinationPoint", exitSpot);
+            patchSafe(toilsToPatch.leave, typeof(LordToil_PrepareCaravan_Leave), "exitSpot", exitSpot);
+        }
+
+        public static void PatchToilsPackingSpot(IntVec3 packingSpot)
+        {
+            patchSafe(toilsToPatch.gatherAnimals,     typeof(LordToil_PrepareCaravan_GatherAnimals),     "destinationPoint", packingSpot);
+            patchSafe(toilsToPatch.gatherItems,       typeof(LordToil_PrepareCaravan_GatherItems),       "meetingPoint", packingSpot);
+            patchSafe(toilsToPatch.gatherDownedPawns, typeof(LordToil_PrepareCaravan_GatherDownedPawns), "meetingPoint", packingSpot);
+            patchSafe(toilsToPatch.wait,              typeof(LordToil_PrepareCaravan_Wait),              "meetingPoint", packingSpot);
         }
 
         public static void CreateGraph_Postfix(StateGraph __result, LordJob_FormAndSendCaravan __instance)
         {
-            // 🧠 Your logic here: add stuff to the graph
-            // Example:
-            Log.Message("Adding node to the StateGraph...");
+            Log.Message("Adding transisiont to the StateGraph...");
 
-            LordToil                                  gatherAnimals     = __result.lordToils.OfType<LordToil_PrepareCaravan_GatherAnimals>().FirstOrDefault();
-            LordToil                                  gatherItems       = __result.lordToils.OfType<LordToil_PrepareCaravan_GatherItems>().FirstOrDefault();
+            LordToil_PrepareCaravan_GatherAnimals     gatherAnimals     = __result.lordToils.OfType<LordToil_PrepareCaravan_GatherAnimals>().FirstOrDefault();
+            LordToil_PrepareCaravan_GatherItems       gatherItems       = __result.lordToils.OfType<LordToil_PrepareCaravan_GatherItems>().FirstOrDefault();
             LordToil_PrepareCaravan_GatherDownedPawns gatherDownedPawns = __result.lordToils.OfType<LordToil_PrepareCaravan_GatherDownedPawns>().FirstOrDefault();
+            LordToil_PrepareCaravan_Wait              wait              = __result.lordToils.OfType<LordToil_PrepareCaravan_Wait>().FirstOrDefault();
             LordToil_PrepareCaravan_CollectAnimals    collectAnimals    = __result.lordToils.OfType<LordToil_PrepareCaravan_CollectAnimals>().FirstOrDefault();
             LordToil_PrepareCaravan_Leave             leave             = __result.lordToils.OfType<LordToil_PrepareCaravan_Leave>().FirstOrDefault();
 
+            toilsToPatch.gatherAnimals = gatherAnimals;
+            toilsToPatch.gatherItems = gatherItems;
+            toilsToPatch.gatherDownedPawns = gatherDownedPawns;
+            toilsToPatch.wait = wait;
+            toilsToPatch.collectAnimals = collectAnimals;
+            toilsToPatch.leave = leave;
 
-            if (collectAnimals != null)
+            string trigger;
+
+            void addTransistion(LordToil from, LordToil to, bool endAllJobs = true)
             {
-                if (gatherAnimals != null)
+                if (from != null && to != null)
                 {
-                    Transition transition = new Transition(gatherAnimals, collectAnimals);
-                    transition.AddTrigger(new Trigger_Memo("CaravanLeaveNow"));
-                    __result.AddTransition(transition);
-                }
-                if (gatherItems != null)
-                {
-                    Transition transition = new Transition(gatherItems, collectAnimals);
-                    transition.AddTrigger(new Trigger_Memo("CaravanLeaveNow"));
-                    __result.AddTransition(transition);
-                }
-                if (gatherDownedPawns != null)
-                {
-                    Transition transition = new Transition(gatherDownedPawns, collectAnimals);
-                    transition.AddTrigger(new Trigger_Memo("CaravanLeaveNow"));
+                    Transition transition = new Transition(from, to);
+                    transition.AddTrigger(new Trigger_Memo(trigger));
+                    transition.AddPostAction(new TransitionAction_EndAllJobs());
                     __result.AddTransition(transition);
                 }
             }
 
-            if (leave != null && gatherItems != null)
-            {
-                {
-                    Transition transition = new Transition(leave, gatherItems);
-                    transition.AddTrigger(new Trigger_Memo("CaravanBackToPacking"));
-                    __result.AddTransition(transition);
-                }
-            }
+            trigger = "CaravanLeaveNow";
+            addTransistion(gatherAnimals,     collectAnimals);
+            addTransistion(gatherItems,       collectAnimals);
+            addTransistion(gatherDownedPawns, collectAnimals);
 
-            if (gatherDownedPawns != null)
-                toilsToPatch.gatherDownedPawns = gatherDownedPawns;
+            trigger = "CaravanBackToGatherAnimals";
+            addTransistion(gatherItems, gatherAnimals);
+            addTransistion(gatherDownedPawns, gatherAnimals);
+            addTransistion(wait, gatherAnimals);
+            addTransistion(collectAnimals, gatherAnimals);
+            addTransistion(leave, gatherAnimals);
 
-            if (collectAnimals != null)
-                toilsToPatch.collectAnimals = collectAnimals;
+            trigger = "CaravanBackToGatherItems";
+            addTransistion(gatherDownedPawns, gatherItems, false);
+            addTransistion(wait, gatherItems, false);
+            addTransistion(collectAnimals, gatherItems, false);
+            addTransistion(leave, gatherItems, false);
 
-            if (leave != null)
-                toilsToPatch.leave = leave;
+            trigger = "CaravanBackToGatherDownedPawns";
+            addTransistion(wait, gatherDownedPawns);
+            addTransistion(collectAnimals, gatherDownedPawns);
+            addTransistion(leave, gatherDownedPawns);
+
 
         }
-
-        public static void daFloatMenuePatch(Pawn pawn, JobDef myJob, Pawn targetAnimal)
-        {
-
-            // MyDefOf.LoadOntoAnimal
-
-            JobDriver_PrepareCaravan_GatherItems.IsUsableCarrier(targetAnimal, pawn, true);
-
-            FloatMenuOption option = new FloatMenuOption("Load items onto pack animal", () =>
-            {
-                Job job = JobMaker.MakeJob(myJob, targetAnimal);
-                pawn.jobs.TryTakeOrderedJob(job);
-            });
-        }
-
 
         public static readonly Texture2D AddToCaravanCommand = ContentFinder<Texture2D>.Get("UI/Commands/AddToCaravan", true);
     }
 
+
+    // Static class to track the float menu option we want to modify
+    public static class FloatMenuOptionTracker
+    {
+        public static List<FloatMenuOption> lastLoadIntoCaravan;
+        public static List<FloatMenuOption> lastLoadIntoCaravanAll;
+        public static List<FloatMenuOption> lastLoadIntoCaravanSome;
+
+        public static void TrackLoadIntoCaravan(FloatMenuOption opt) { lastLoadIntoCaravan.Add(opt); }
+        public static void TrackLoadIntoCaravanAll(FloatMenuOption opt) { lastLoadIntoCaravanAll.Add(opt); }
+        public static void TrackLoadIntoCaravanSome(FloatMenuOption opt) { lastLoadIntoCaravanSome.Add(opt); }
+    }
+
+    // Patch the private static method
+    [HarmonyPatch(typeof(FloatMenuMakerMap), "AddHumanlikeOrders")]
+    public static class Patch_AddHumanlikeOrders
+    {
+        // Transpiler to intercept and track the FloatMenuOption
+        [HarmonyTranspiler]
+        public static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+        {
+            int phase = 0;
+
+            foreach (CodeInstruction instruction in instructions)
+            {
+                yield return instruction;
+
+                switch (phase)
+                {
+                    case 0:
+                        if (instruction.Calls(AccessTools.Method(typeof(CaravanFormingUtility), nameof(CaravanFormingUtility.CapacityLeft))))
+                        {
+                            Log.Message($"Transpiler phase {phase} success");
+                            phase++;
+                        }
+                        break;
+
+                    case 1:
+                        if (instruction.Calls(AccessTools.Method(typeof(FloatMenuUtility), nameof(FloatMenuUtility.DecoratePrioritizedTask))))
+                        {
+                            Log.Message($"Transpiler phase {phase} success");
+                            phase++;
+                            yield return new CodeInstruction(OpCodes.Dup); // Duplicate the FloatMenuOption on stack
+                            yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(FloatMenuOptionTracker), nameof(FloatMenuOptionTracker.TrackLoadIntoCaravan)));
+                        }
+                        break;
+
+                    case 2:
+                        if (instruction.Calls(AccessTools.Method(typeof(FloatMenuUtility), nameof(FloatMenuUtility.DecoratePrioritizedTask))))
+                        {
+                            Log.Message($"Transpiler phase {phase} success");
+                            phase++;
+                            yield return new CodeInstruction(OpCodes.Dup); // Duplicate the FloatMenuOption on stack
+                            yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(FloatMenuOptionTracker), nameof(FloatMenuOptionTracker.TrackLoadIntoCaravanAll)));
+                        }
+                        break;
+
+                    case 3:
+                        if (instruction.Calls(AccessTools.Method(typeof(FloatMenuUtility), nameof(FloatMenuUtility.DecoratePrioritizedTask))))
+                        {
+                            Log.Message($"Transpiler phase {phase} success");
+                            phase++;
+                            yield return new CodeInstruction(OpCodes.Dup); // Duplicate the FloatMenuOption on stack
+                            yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(FloatMenuOptionTracker), nameof(FloatMenuOptionTracker.TrackLoadIntoCaravanSome)));
+                        }
+                        break;
+
+                    case 4:
+                        break;
+                }
+            }
+        }
+
+        [HarmonyPrefix]
+        public static bool Prefix(Vector3 clickPos, Pawn pawn, List<FloatMenuOption> opts)
+        {
+            FloatMenuOptionTracker.lastLoadIntoCaravan = new List<FloatMenuOption>();
+            FloatMenuOptionTracker.lastLoadIntoCaravanAll = new List<FloatMenuOption>();
+            FloatMenuOptionTracker.lastLoadIntoCaravanSome = new List<FloatMenuOption>();
+
+            return true;
+        }
+
+        [HarmonyPostfix]
+        public static void Postfix(Vector3 clickPos, Pawn pawn, List<FloatMenuOption> opts)
+        {
+            void patchOption(FloatMenuOption option)
+            {
+                if (option.action != null)
+                {
+                    Action originalAction = option.action;
+
+                    void newAction()
+                    {
+
+                        Log.Message("New Action !!");
+
+                        originalAction();
+
+                        pawn?.GetLord()?.ReceiveMemo("CaravanBackToGatherItems");
+                    }
+                    
+                    option.action = newAction;
+                }
+            }
+
+            foreach (FloatMenuOption option in FloatMenuOptionTracker.lastLoadIntoCaravan)
+                patchOption(option);
+
+            foreach (FloatMenuOption option in FloatMenuOptionTracker.lastLoadIntoCaravanAll)
+                patchOption(option);
+
+            foreach (FloatMenuOption option in FloatMenuOptionTracker.lastLoadIntoCaravanSome)
+                patchOption(option);
+        }
+    }
 }

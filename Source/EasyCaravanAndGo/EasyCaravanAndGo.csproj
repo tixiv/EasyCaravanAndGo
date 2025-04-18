@@ -57,7 +57,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="EasyCaravanAndGo.cs" />
-    <Compile Include="JobDriver_PackInventoryOnCaravanAnimal.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
