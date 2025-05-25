@@ -9,6 +9,7 @@ using RimWorld;
 using RimWorld.Planet;
 using Verse;
 using static EasyCaravanAndGo.EasyCaravanAndGo;
+using static UnityEngine.Scripting.GarbageCollector;
 
 namespace EasyCaravanAndGo
 {
@@ -24,6 +25,12 @@ namespace EasyCaravanAndGo
 
             harmony.Patch(AccessTools.Method(typeof(LordToil_PrepareCaravan_GatherDownedPawns), "CheckAllPawnsArrived"),
                 transpiler: new HarmonyMethod(typeof(Patch_GatherDownedPawns), nameof(Patch_GatherDownedPawns.Transpiler_LordToil)));
+
+
+            harmony.Patch(AccessTools.Method(typeof(CaravanExitMapUtility), nameof(CaravanExitMapUtility.ExitMapAndCreateCaravan),
+                new Type[] {typeof(IEnumerable<Pawn>), typeof(Faction), typeof(int) /* exitFromTile */, typeof(int) /* directionTile */,
+                    typeof(int) /* destinationTile */, typeof(bool) /* sendMessage */ }),
+                prefix: new HarmonyMethod(typeof(Patch_GatherDownedPawns), nameof(ExitMapAndCreateCaravan_Prefix)));
         }
 
 
@@ -89,6 +96,23 @@ namespace EasyCaravanAndGo
         public static IEnumerable<CodeInstruction> Transpiler_LordToil(IEnumerable<CodeInstruction> instructions)
         {
             return Transpiler(instructions, "LordToil_PrepareCaravan_GatherDownedPawns::CheckAllPawnsArrived()");
+        }
+
+
+        // Drop the carried pawn if someone is still carrying it at the exit spot
+        public static bool ExitMapAndCreateCaravan_Prefix(IEnumerable<Pawn> pawns)
+        {
+            foreach (Pawn pawn in pawns)
+            {
+                var carryTracker = pawn.holdingOwner?.Owner as Pawn_CarryTracker;
+                Pawn carrier = carryTracker?.pawn;
+
+                if (carrier != null) {
+                    // Drop it at the carrier's current position
+                    carryTracker.innerContainer.TryDrop(pawn, carrier.Position, carrier.MapHeld, ThingPlaceMode.Near, 1, out Thing droppedThing);
+                }
+            }
+            return true;
         }
     }
 }

@@ -203,6 +203,10 @@ namespace EasyCaravanAndGo
                         Find.WorldGrid.GetTileNeighbors(startingTile, surroundingTiles);
                         int neighborTile = surroundingTiles.First();
 
+                        // TODO: Use this instead, depending on closest map edge
+                        // Maybe even patch it later if exit spot is changed
+                        // int directionTile = CaravanExitMapUtility.FindRandomStartingTileBasedOnExitDir(exitFromTile, dir);
+
                         var exitSpot = TryFindExitSpot(pawn.Map, pawns, startingTile);
                         if (exitSpot.HasValue)
                         {
@@ -327,8 +331,6 @@ namespace EasyCaravanAndGo
 
         public static void CreateGraph_Postfix(StateGraph __result, LordJob_FormAndSendCaravan __instance)
         {
-            Log.Message("Adding transisiont to the StateGraph...");
-
             LordToil_PrepareCaravan_GatherAnimals gatherAnimals = __result.lordToils.OfType<LordToil_PrepareCaravan_GatherAnimals>().FirstOrDefault();
             LordToil_PrepareCaravan_GatherItems gatherItems = __result.lordToils.OfType<LordToil_PrepareCaravan_GatherItems>().FirstOrDefault();
             LordToil_PrepareCaravan_GatherDownedPawns gatherDownedPawns = __result.lordToils.OfType<LordToil_PrepareCaravan_GatherDownedPawns>().FirstOrDefault();
@@ -355,7 +357,7 @@ namespace EasyCaravanAndGo
 
             string trigger;
 
-            void addTransistion(LordToil from, LordToil to, bool endAllJobs = true)
+            void addTransistion(LordToil from, LordToil to)
             {
                 if (from != null && to != null)
                 {
