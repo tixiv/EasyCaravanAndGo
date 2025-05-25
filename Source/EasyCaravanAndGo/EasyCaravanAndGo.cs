@@ -14,6 +14,8 @@ using System.Reflection.Emit;
 using System.Reflection;
 using System.Collections;
 using System.Diagnostics;
+using System.Runtime.ConstrainedExecution;
+using static UnityEngine.GraphicsBuffer;
 
 namespace EasyCaravanAndGo
 {
@@ -32,6 +34,9 @@ namespace EasyCaravanAndGo
 
             harmony.Patch(AccessTools.Method(typeof(LordJob_FormAndSendCaravan), "SendCaravan"),
                 prefix: new HarmonyMethod(typeof(EasyCaravanAndGo), nameof(EasyCaravanAndGo.SendCaravan_Prefix)));
+
+            harmony.Patch(AccessTools.Method(typeof(GiveToPackAnimalUtility), nameof(GiveToPackAnimalUtility.UsablePackAnimalWithTheMostFreeSpace)),
+                postfix: new HarmonyMethod(typeof(EasyCaravanAndGo), nameof(EasyCaravanAndGo.UsablePackAnimalWithTheMostFreeSpace_Postfix)));
 
             harmony.PatchAll();
 
@@ -94,6 +99,12 @@ namespace EasyCaravanAndGo
             };
         }
 
+        public static readonly Texture2D FormCaravanIcon = ContentFinder<Texture2D>.Get("UI/Commands/FormCaravan", true);
+        public static readonly Texture2D SetPackingSpotIcon = ContentFinder<Texture2D>.Get("UI/EasyCaravanAndGo/SetPackingSpot", true);
+        public static readonly Texture2D SetExitSpotIcon = ContentFinder<Texture2D>.Get("UI/EasyCaravanAndGo/SetExitSpot", true);
+        public static readonly Texture2D CaravanLeaveIcon = ContentFinder<Texture2D>.Get("UI/EasyCaravanAndGo/CaravanLeave", true);
+
+
         public static void GetGizmos_Postfix(Pawn pawn, ref IEnumerable<Gizmo> __result)
         {
             if (pawn.NonHumanlikeOrWildMan())
@@ -107,101 +118,64 @@ namespace EasyCaravanAndGo
             {
                 newGizmos.Add(new Command_Action
                 {
+                    defaultLabel = "Set Packing Spot",
+                    defaultDesc = "Set new packing spot for this caravan.",
+                    icon = SetPackingSpotIcon,
+                    action = () =>
+                    {
+                        TargetingParameters targetParams = CaravanPackingTargetParams();
+
+                        void action(LocalTargetInfo target)
+                        {
+                            PatchPackingSpot(lordJob, target.Cell);
+                        }
+
+                        Find.Targeter.BeginTargeting(
+                            targetParams,
+                            action,
+                            null,
+                            null,
+                            TexCommand.Attack, // or null for default
+                            true
+                        );
+                    }
+                });
+
+                newGizmos.Add(new Command_Action
+                {
+                    defaultLabel = "Select Exit Cell",
+                    defaultDesc = "Choose a location on the map edge where the caravan should exit.",
+                    icon = SetExitSpotIcon,
+                    action = () =>
+                    {
+                        TargetingParameters targetParams = CaravanExitTargetParams();
+
+                        void targeterAction(LocalTargetInfo target)
+                        {
+                            PatchExitSpot(lordJob, target.Cell);
+                        }
+
+                        Find.Targeter.BeginTargeting(
+                            targetParams,
+                            targeterAction,
+                            null,
+                            null,
+                            TexCommand.Attack, // or null for default
+                            true
+                        );
+                    }
+                });
+
+                newGizmos.Add(new Command_Action
+                {
                     defaultLabel = "Caravan Leave",
                     defaultDesc = "Force the caravan to leave now.",
-                    icon = TexCommand.Attack,
+                    icon = CaravanLeaveIcon,
                     action = () =>
                     {
                         lord.ReceiveMemo("CaravanLeaveNow");
                     }
                 });
-
-                if (toilsToPatch.ContainsKey(lordJob))
-                {
-                    ToilsToPatch ttp = toilsToPatch[lordJob];
-
-                    newGizmos.Add(new Command_Action
-                    {
-                        defaultLabel = "Select Exit Cell",
-                        defaultDesc = "Choose a location on the edge of the map where the caravan should exit.",
-                        icon = TexCommand.Attack,
-                        action = () =>
-                        {
-                            TargetingParameters targetParams = CaravanExitTargetParams();
-
-                            void action(LocalTargetInfo target)
-                            {
-                                IntVec3 exitSpot = target.Cell;
-
-                                Messages.Message("Caravan exit set to " + exitSpot, MessageTypeDefOf.PositiveEvent);
-
-                                // Patch all the exit spots
-                                PatchSafe(lordJob, typeof(LordJob_FormAndSendCaravan), "exitSpot", exitSpot);
-                                PatchSafe(ttp.gatherDownedPawns, typeof(LordToil_PrepareCaravan_GatherDownedPawns), "exitSpot", exitSpot);
-                                PatchSafe(ttp.collectAnimals, typeof(LordToil_PrepareCaravan_CollectAnimals), "destinationPoint", exitSpot);
-                                PatchSafe(ttp.leave, typeof(LordToil_PrepareCaravan_Leave), "exitSpot", exitSpot);
-
-                                lord.ReceiveMemo("CaravanBackToGatherDownedPawns");
-                            }
-
-                            Find.Targeter.BeginTargeting(
-                                targetParams,
-                                action,
-                                null,
-                                null,
-                                TexCommand.Attack, // or null for default
-                                true
-                            );
-                        }
-                    });
-
-                    newGizmos.Add(new Command_Action
-                    {
-                        defaultLabel = "Set Packing Spot",
-                        defaultDesc = "Update the packing spot for this caravan.",
-                        icon = TexCommand.Attack,
-                        action = () =>
-                        {
-                            TargetingParameters targetParams = CaravanPackingTargetParams();
-
-                            void action(LocalTargetInfo target)
-                            {
-                                IntVec3 packingSpot = target.Cell;
-
-                                Messages.Message("Caravan packing spot set to " + packingSpot, MessageTypeDefOf.PositiveEvent);
-                                Log.Message("Caravan packing spot set to " + packingSpot);
-
-                                // Patch all the packing spots
-                                PatchSafe(lordJob, typeof(LordJob_FormAndSendCaravan), "meetingPoint", packingSpot);
-                                PatchSafe(ttp.gatherAnimals, typeof(LordToil_PrepareCaravan_GatherAnimals), "destinationPoint", packingSpot);
-                                PatchSafe(ttp.gatherItems, typeof(LordToil_PrepareCaravan_GatherItems), "meetingPoint", packingSpot);
-                                PatchSafe(ttp.gatherDownedPawns, typeof(LordToil_PrepareCaravan_GatherDownedPawns), "meetingPoint", packingSpot);
-                                PatchSafe(ttp.wait, typeof(LordToil_PrepareCaravan_Wait), "meetingPoint", packingSpot);
-
-                                if (lord.CurLordToil is LordToil_PrepareCaravan_GatherAnimals)
-                                {
-                                    lord.CurLordToil.UpdateAllDuties();
-                                    TransitionAction_EndJobs.DoAction(lord);
-                                }
-                                else
-                                    lord.ReceiveMemo("CaravanBackToGatherAnimals");
-                            }
-
-                            Find.Targeter.BeginTargeting(
-                                targetParams,
-                                action,
-                                null,
-                                null,
-                                TexCommand.Attack, // or null for default
-                                true
-                            );
-                        }
-                    });
-                }
-                else
-                {
-                    Log.Warning("toilsToPatch does not contain this LoardJob");
-                }
             }
             else
             {
@@ -210,7 +184,7 @@ namespace EasyCaravanAndGo
                 {
                     defaultLabel = "Form Caravan",
                     defaultDesc = "Form a caravan that only includes this pawn",
-                    icon = AddToCaravanCommand,
+                    icon = FormCaravanIcon,
                     action = () =>
                     {
                         List<Pawn> pawns = new List<Pawn>();
@@ -264,13 +238,71 @@ namespace EasyCaravanAndGo
                 if (field != null)
                 {
                     field.SetValue(obj, value);
-                    Log.Message($"Patched {type}.{fieldName} to {value}");
+                    // Log.Message($"Patched {type}.{fieldName} to {value}");
                 }
                 else
                     Log.Warning($"Field '{fieldName}' not found in {type}");
             }
             else
                 Log.Warning($"{type} instance is null");
+        }
+
+        public static void PatchPackingSpot(LordJob_FormAndSendCaravan lordJob, IntVec3 packingSpot)
+        {
+            var lord = lordJob.lord;
+
+            if (lord != null && toilsToPatch.ContainsKey(lordJob))
+            {
+                ToilsToPatch ttp = toilsToPatch[lordJob];
+
+                // Patch all the packing spots
+                PatchSafe(lordJob, typeof(LordJob_FormAndSendCaravan), "meetingPoint", packingSpot);
+                PatchSafe(ttp.gatherAnimals, typeof(LordToil_PrepareCaravan_GatherAnimals), "destinationPoint", packingSpot);
+                PatchSafe(ttp.gatherItems, typeof(LordToil_PrepareCaravan_GatherItems), "meetingPoint", packingSpot);
+                PatchSafe(ttp.gatherDownedPawns, typeof(LordToil_PrepareCaravan_GatherDownedPawns), "meetingPoint", packingSpot);
+                PatchSafe(ttp.wait, typeof(LordToil_PrepareCaravan_Wait), "meetingPoint", packingSpot);
+
+                if (lord.CurLordToil is LordToil_PrepareCaravan_GatherAnimals)
+                {
+                    lord.CurLordToil.UpdateAllDuties();
+                    TransitionAction_EndJobs.DoAction(lord);
+                }
+                else
+                {
+                    lord.ReceiveMemo("CaravanBackToGatherAnimals");
+                }
+
+                Messages.Message("Caravan packing spot set to " + packingSpot, MessageTypeDefOf.PositiveEvent);
+
+            }
+            else
+            {
+                Log.Warning("Patching packing spot failed: No lord or toilsToPatch does not contain this LoardJob");
+            }
+        }
+
+        public static void PatchExitSpot(LordJob_FormAndSendCaravan lordJob, IntVec3 exitSpot)
+        {
+            var lord = lordJob.lord;
+
+            if (lord != null && toilsToPatch.ContainsKey(lordJob))
+            {
+                ToilsToPatch ttp = toilsToPatch[lordJob];
+
+                // Patch all the exit spots
+                PatchSafe(lordJob, typeof(LordJob_FormAndSendCaravan), "exitSpot", exitSpot);
+                PatchSafe(ttp.gatherDownedPawns, typeof(LordToil_PrepareCaravan_GatherDownedPawns), "exitSpot", exitSpot);
+                PatchSafe(ttp.collectAnimals, typeof(LordToil_PrepareCaravan_CollectAnimals), "destinationPoint", exitSpot);
+                PatchSafe(ttp.leave, typeof(LordToil_PrepareCaravan_Leave), "exitSpot", exitSpot);
+
+                lordJob.lord?.ReceiveMemo("CaravanBackToGatherDownedPawns");
+
+                Messages.Message("Caravan exit set to " + exitSpot, MessageTypeDefOf.PositiveEvent);
+            }
+            else
+            {
+                Log.Warning("Patching caravan exit failed: No lord or toilsToPatch does not contain this LoardJob");
+            }
         }
 
         public class TransitionAction_EndJobs : TransitionAction
@@ -365,11 +397,34 @@ namespace EasyCaravanAndGo
             return true;
         }
 
-        public static readonly Texture2D AddToCaravanCommand = ContentFinder<Texture2D>.Get("UI/Commands/AddToCaravan", true);
+        public static void UsablePackAnimalWithTheMostFreeSpace_Postfix(Pawn pawn, ref Pawn __result)
+        {
+            // This fixes a  - bug I guess I would call it - in Rimworld where
+            // when you "load onto caravan" things manually and you have pack animals, it
+            // will never consider loading stuff onto the pawn itself. The result is that
+            // You can load up your animals just fine, but you can't utilise the pawns
+            // carrying capacity.
+            // This attempts to work around this in a slightly dirty way: we check whether the
+            // animal is "full" (less than 2 weight units left) and the pawn itself could carry more.
+            // In that case we return null here so 'MenuMakerMap::AddHumalikeOrders()' will
+            // choose the pawn itself because there "are no suitable carrier animals".
+
+            if (__result != null && pawn != null)
+            {
+
+                float pawnCapacity = MassUtility.FreeSpace(pawn);
+                float animalCapacity = MassUtility.FreeSpace(__result);
+
+                if (animalCapacity < 2.0f && animalCapacity < pawnCapacity)
+                { 
+                    __result = null;
+                }
+            }
+        }
     }
 
 
-    // Static class to track the float menu option we want to modify
+    // Static class to track the float menu options we want to modify
     public static class FloatMenuOptionTracker
     {
         public static List<FloatMenuOption> lastLoadIntoCaravan;
@@ -379,6 +434,13 @@ namespace EasyCaravanAndGo
         public static void TrackLoadIntoCaravan(FloatMenuOption opt) { lastLoadIntoCaravan.Add(opt); }
         public static void TrackLoadIntoCaravanAll(FloatMenuOption opt) { lastLoadIntoCaravanAll.Add(opt); }
         public static void TrackLoadIntoCaravanSome(FloatMenuOption opt) { lastLoadIntoCaravanSome.Add(opt); }
+
+        public static void clear()
+        {
+            lastLoadIntoCaravan = new List<FloatMenuOption>();
+            lastLoadIntoCaravanAll = new List<FloatMenuOption>();
+            lastLoadIntoCaravanSome = new List<FloatMenuOption>();
+        }
     }
 
     [HarmonyPatch(typeof(FloatMenuMakerMap), "AddHumanlikeOrders")]
@@ -443,10 +505,7 @@ namespace EasyCaravanAndGo
         [HarmonyPrefix]
         public static bool Prefix(Vector3 clickPos, Pawn pawn, List<FloatMenuOption> opts)
         {
-            FloatMenuOptionTracker.lastLoadIntoCaravan = new List<FloatMenuOption>();
-            FloatMenuOptionTracker.lastLoadIntoCaravanAll = new List<FloatMenuOption>();
-            FloatMenuOptionTracker.lastLoadIntoCaravanSome = new List<FloatMenuOption>();
-
+            FloatMenuOptionTracker.clear();
             return true;
         }
 
@@ -478,8 +537,16 @@ namespace EasyCaravanAndGo
 
             foreach (FloatMenuOption option in FloatMenuOptionTracker.lastLoadIntoCaravanSome)
                 patchOption(option);
+
+            FloatMenuOptionTracker.clear();
         }
     }
+
+    // This patch changes the behaviour of the gather items lord toil so that the caravan forming
+    // will remain in the state "gather items" as long as any caravan pawns still have one of these
+    // two jobs, which are assigned to them when you load stuff onto an existing caravan through the float menu.
+    // This is very helpfull if the caravan has pack animals, because it stops the caravan forming from progressing
+    // to "collect animals" while you are still manually loading stuff on them.
 
     [HarmonyPatch(typeof(LordToil_PrepareCaravan_GatherItems), nameof(LordToil_PrepareCaravan_GatherItems.LordToilTick))]
     public static class Patch_LordToil_GatherItems
