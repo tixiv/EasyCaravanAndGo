@@ -16,6 +16,7 @@ using System.Collections;
 using System.Diagnostics;
 using System.Runtime.ConstrainedExecution;
 using static UnityEngine.GraphicsBuffer;
+using static Verse.HediffCompProperties_RandomizeSeverityPhases;
 
 namespace EasyCaravanAndGo
 {
@@ -37,6 +38,8 @@ namespace EasyCaravanAndGo
 
             harmony.Patch(AccessTools.Method(typeof(GiveToPackAnimalUtility), nameof(GiveToPackAnimalUtility.UsablePackAnimalWithTheMostFreeSpace)),
                 postfix: new HarmonyMethod(typeof(EasyCaravanAndGo), nameof(EasyCaravanAndGo.UsablePackAnimalWithTheMostFreeSpace_Postfix)));
+
+            Patch_GatherDownedPawns.Patch(harmony);
 
             harmony.PatchAll();
 
@@ -104,12 +107,8 @@ namespace EasyCaravanAndGo
         public static readonly Texture2D SetExitSpotIcon = ContentFinder<Texture2D>.Get("UI/EasyCaravanAndGo/SetExitSpot", true);
         public static readonly Texture2D CaravanLeaveIcon = ContentFinder<Texture2D>.Get("UI/EasyCaravanAndGo/CaravanLeave", true);
 
-
         public static void GetGizmos_Postfix(Pawn pawn, ref IEnumerable<Gizmo> __result)
         {
-            if (pawn.NonHumanlikeOrWildMan())
-                return;
-
             List<Gizmo> newGizmos = new List<Gizmo>(__result);
 
             var lord = pawn.GetLord();
@@ -176,8 +175,10 @@ namespace EasyCaravanAndGo
                         lord.ReceiveMemo("CaravanLeaveNow");
                     }
                 });
+
+                __result = newGizmos;
             }
-            else
+            else if (!pawn.NonHumanlikeOrWildMan())
             {
 
                 newGizmos.Add(new Command_Action
@@ -210,9 +211,9 @@ namespace EasyCaravanAndGo
                         }
                     }
                 });
-            }
 
-            __result = newGizmos;
+                __result = newGizmos;
+            }
         }
 
         public struct ToilsToPatch
@@ -225,9 +226,8 @@ namespace EasyCaravanAndGo
             public LordToil_PrepareCaravan_Leave leave;
         }
 
-        // I might want to make this a Dictionary if multiple caravans are being formed, which is actually a usecase, ChatGpt, thanks for reminding me!
+        // One set of toils to patch per 'LordJob_FormAndSendCaravan'.
         public static Dictionary<LordJob_FormAndSendCaravan, ToilsToPatch> toilsToPatch;
-
 
         public static void PatchSafe(object obj, Type type, string fieldName, IntVec3 value)
         {
@@ -435,7 +435,7 @@ namespace EasyCaravanAndGo
         public static void TrackLoadIntoCaravanAll(FloatMenuOption opt) { lastLoadIntoCaravanAll.Add(opt); }
         public static void TrackLoadIntoCaravanSome(FloatMenuOption opt) { lastLoadIntoCaravanSome.Add(opt); }
 
-        public static void clear()
+        public static void Clear()
         {
             lastLoadIntoCaravan = new List<FloatMenuOption>();
             lastLoadIntoCaravanAll = new List<FloatMenuOption>();
@@ -461,7 +461,7 @@ namespace EasyCaravanAndGo
                     case 0:
                         if (instruction.Calls(AccessTools.Method(typeof(CaravanFormingUtility), nameof(CaravanFormingUtility.CapacityLeft))))
                         {
-                            Log.Message($"Transpiler phase {phase} success");
+                            // Log.Message($"Transpiler phase {phase} success");
                             phase++;
                         }
                         break;
@@ -469,7 +469,7 @@ namespace EasyCaravanAndGo
                     case 1:
                         if (instruction.Calls(AccessTools.Method(typeof(FloatMenuUtility), nameof(FloatMenuUtility.DecoratePrioritizedTask))))
                         {
-                            Log.Message($"Transpiler phase {phase} success");
+                            // Log.Message($"Transpiler phase {phase} success");
                             phase++;
                             yield return new CodeInstruction(OpCodes.Dup); // Duplicate the FloatMenuOption on stack
                             yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(FloatMenuOptionTracker), nameof(FloatMenuOptionTracker.TrackLoadIntoCaravan)));
@@ -479,7 +479,7 @@ namespace EasyCaravanAndGo
                     case 2:
                         if (instruction.Calls(AccessTools.Method(typeof(FloatMenuUtility), nameof(FloatMenuUtility.DecoratePrioritizedTask))))
                         {
-                            Log.Message($"Transpiler phase {phase} success");
+                            // Log.Message($"Transpiler phase {phase} success");
                             phase++;
                             yield return new CodeInstruction(OpCodes.Dup); // Duplicate the FloatMenuOption on stack
                             yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(FloatMenuOptionTracker), nameof(FloatMenuOptionTracker.TrackLoadIntoCaravanAll)));
@@ -489,7 +489,7 @@ namespace EasyCaravanAndGo
                     case 3:
                         if (instruction.Calls(AccessTools.Method(typeof(FloatMenuUtility), nameof(FloatMenuUtility.DecoratePrioritizedTask))))
                         {
-                            Log.Message($"Transpiler phase {phase} success");
+                            // Log.Message($"Transpiler phase {phase} success");
                             phase++;
                             yield return new CodeInstruction(OpCodes.Dup); // Duplicate the FloatMenuOption on stack
                             yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(FloatMenuOptionTracker), nameof(FloatMenuOptionTracker.TrackLoadIntoCaravanSome)));
@@ -500,12 +500,17 @@ namespace EasyCaravanAndGo
                         break;
                 }
             }
+
+            if (phase != 4)
+            {
+                Log.Warning("Transpiler failed to patch FloatMenuMakerMap::AddHumanlikeOrders() correctly.");
+            }
         }
 
         [HarmonyPrefix]
         public static bool Prefix(Vector3 clickPos, Pawn pawn, List<FloatMenuOption> opts)
         {
-            FloatMenuOptionTracker.clear();
+            FloatMenuOptionTracker.Clear();
             return true;
         }
 
@@ -538,7 +543,7 @@ namespace EasyCaravanAndGo
             foreach (FloatMenuOption option in FloatMenuOptionTracker.lastLoadIntoCaravanSome)
                 patchOption(option);
 
-            FloatMenuOptionTracker.clear();
+            FloatMenuOptionTracker.Clear();
         }
     }
 
