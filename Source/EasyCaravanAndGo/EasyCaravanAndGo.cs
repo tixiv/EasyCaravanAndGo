@@ -178,10 +178,9 @@ namespace EasyCaravanAndGo
 
                 __result = newGizmos;
             }
-            else if (!pawn.NonHumanlikeOrWildMan())
+            else if (!pawn.NonHumanlikeOrWildMan() && !CaravanFormingUtility.IsFormingCaravanOrDownedPawnToBeTakenByCaravan(pawn))
             {
-
-                newGizmos.Add(new Command_Action
+                var formCaravanCommand = new Command_Action
                 {
                     defaultLabel = "Form Caravan",
                     defaultDesc = "Form a caravan that only includes this pawn",
@@ -214,7 +213,18 @@ namespace EasyCaravanAndGo
                             Messages.Message("CaravanFormationProcessStarted".Translate(), pawns[0], MessageTypeDefOf.PositiveEvent, false);
                         }
                     }
-                });
+                };
+
+                if (pawn.Downed)
+                {
+                    formCaravanCommand.Disable("IsIncapped".Translate(pawn.LabelShort, pawn));
+                }
+                if (pawn.Deathresting)
+                {
+                    formCaravanCommand.Disable("IsDeathresting".Translate(pawn.Named("PAWN")));
+                }
+
+                newGizmos.Add(formCaravanCommand);
 
                 __result = newGizmos;
             }
