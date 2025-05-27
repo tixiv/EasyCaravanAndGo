@@ -7,8 +7,8 @@
   <ECAG_SetHitchingSpot_desc>Set the hitching spot location for this caravan.</ECAG_SetHitchingSpot_desc>
   <ECAG_SetExitCell>Set caravan exit</ECAG_SetExitCell>
   <ECAG_SetExitCell_desc>Choose a location on the map edge where this caravan should exit.</ECAG_SetExitCell_desc>
-  <ECAG_CaravanLeave>Caravan leave</ECAG_CaravanLeave>
-  <ECAG_CaravanLeave_desc>Force the caravan to leave now. Animals will be taken, things not packed yet will be left.</ECAG_CaravanLeave_desc>
+  <ECAG_CaravanLeave>Caravan go!</ECAG_CaravanLeave>
+  <ECAG_CaravanLeave_desc>Force the caravan to leave now. Animals will be taken, but items not packed yet will be left.</ECAG_CaravanLeave_desc>
   
   <ECAG_HitchingSpotUpdated>Caravan hitching spot updated.</ECAG_HitchingSpotUpdated>
   <ECAG_CravanExitUpdated>Caravan exit updated.</ECAG_CravanExitUpdated>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<LanguageData>
+  <ECAG_FormCaravan>Karawane formieren</ECAG_FormCaravan>
+  <ECAG_FormCaravan_desc>Formiert sofort eine Karawane die nur diese Person enthält.",</ECAG_FormCaravan_desc>
+  <ECAG_SetHitchingSpot>Sammelplatz festlegen</ECAG_SetHitchingSpot>
+  <ECAG_SetHitchingSpot_desc>Legt einen neuen Ort für den Karawanensammelplatz fest.</ECAG_SetHitchingSpot_desc>
+  <ECAG_SetExitCell>Ausgang festlegen</ECAG_SetExitCell>
+  <ECAG_SetExitCell_desc>Wählt einen Punkt am Kartenrand wo die Karawane die Karte verlassen soll.</ECAG_SetExitCell_desc>
+  <ECAG_CaravanLeave>Karawane los!</ECAG_CaravanLeave>
+  <ECAG_CaravanLeave_desc>Veranlasst die Karawane so schnell wie möglich die Karte zu verlassen. Tiere werden mitgenommen, bisher nicht gepackte Sachen bleiben aber da.</ECAG_CaravanLeave_desc>
+  
+  <ECAG_HitchingSpotUpdated>Neuer Karawanensammelplatz festgelegt.</ECAG_HitchingSpotUpdated>
+  <ECAG_CravanExitUpdated>Neuer Karawanenausgang festgelegt.</ECAG_CravanExitUpdated>
+  <ECAG_CravanLeaveForced>Karawane wurde veranlasst so schnell wie möglich die Karte zu verlassen.</ECAG_CravanLeaveForced>
+</LanguageData>
