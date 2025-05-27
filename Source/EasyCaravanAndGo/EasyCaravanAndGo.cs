@@ -198,20 +198,17 @@ namespace EasyCaravanAndGo
                         }
 
                         int startingTile = pawn.Map.Parent.Tile;
-
-                        List<int> surroundingTiles = new List<int>();
-                        Find.WorldGrid.GetTileNeighbors(startingTile, surroundingTiles);
-                        int neighborTile = surroundingTiles.First();
-
-                        // TODO: Use this instead, depending on closest map edge
-                        // Maybe even patch it later if exit spot is changed
-                        // int directionTile = CaravanExitMapUtility.FindRandomStartingTileBasedOnExitDir(exitFromTile, dir);
+                        int destinationTile = -1;
 
                         var exitSpot = TryFindExitSpot(pawn.Map, pawns, startingTile);
                         if (exitSpot.HasValue)
                         {
-                            CaravanFormingUtility.StartFormingCaravan(pawns, new List<Pawn>(), Faction.OfPlayer, new List<TransferableOneWay>(), pawn.Position, exitSpot.Value, startingTile, neighborTile);
+                            CaravanFormingUtility.StartFormingCaravan(pawns, new List<Pawn>(), Faction.OfPlayer, new List<TransferableOneWay>(), pawn.Position, exitSpot.Value, startingTile, destinationTile);
                             Messages.Message("CaravanFormationProcessStarted".Translate(), pawns[0], MessageTypeDefOf.PositiveEvent, false);
+                        }
+                        else
+                        {
+                            Log.Error("Failed to find caravan exit spot.");
                         }
                     }
                 };
