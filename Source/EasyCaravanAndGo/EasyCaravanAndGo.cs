@@ -67,6 +67,7 @@ namespace EasyCaravanAndGo
             return (IntVec3)parameters[2]; // out parameter is modified in-place
         }
 
+
         public static TargetingParameters CaravanExitTargetParams()
         {
             return new TargetingParameters
@@ -188,14 +189,14 @@ namespace EasyCaravanAndGo
                     icon = FormCaravanIcon,
                     action = () =>
                     {
-                        List<Pawn> pawns = new List<Pawn>();
-                        pawns.Add(pawn);
-
                         if (pawn == null || pawn.MapHeld == null || pawn.MapHeld.Parent == null)
                         {
                             Log.Error("pawn, pawn.MapHeld or pawn.Mapheld.Parent is null. Can't form Caravan");
                             return;
                         }
+
+                        List<Pawn> pawns = new List<Pawn>();
+                        pawns.Add(pawn);
 
                         int startingTile = pawn.Map.Parent.Tile;
                         int destinationTile = -1;
@@ -204,7 +205,7 @@ namespace EasyCaravanAndGo
                         if (exitSpot.HasValue)
                         {
                             CaravanFormingUtility.StartFormingCaravan(pawns, new List<Pawn>(), Faction.OfPlayer, new List<TransferableOneWay>(), pawn.Position, exitSpot.Value, startingTile, destinationTile);
-                            Messages.Message("CaravanFormationProcessStarted".Translate(), pawns[0], MessageTypeDefOf.PositiveEvent, false);
+                            Messages.Message("CaravanFormationProcessStarted".Translate(), pawn, MessageTypeDefOf.PositiveEvent, false);
                         }
                         else
                         {
