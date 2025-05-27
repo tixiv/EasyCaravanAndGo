@@ -69,8 +69,10 @@ namespace EasyCaravanAndGo
                     typeof(JobGiver_PrepareCaravan_GatherDownedPawns),
                     nameof(JobGiver_PrepareCaravan_GatherDownedPawns.IsDownedPawnNearExitPoint))))
                 {
+                    // Log.Message($"Transpiler {methodName} success");
+
                     found = true;
-                    Log.Message($"Transpiler {methodName} success");
+
                     yield return new CodeInstruction(
                         OpCodes.Call, AccessTools.Method(typeof(Patch_GatherDownedPawns), nameof(IsDownedPawnNearExitPoint_OrBeingCarried)));
                 }

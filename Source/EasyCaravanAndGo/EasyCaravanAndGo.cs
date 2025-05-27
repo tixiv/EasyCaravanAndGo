@@ -117,8 +117,8 @@ namespace EasyCaravanAndGo
             {
                 newGizmos.Add(new Command_Action
                 {
-                    defaultLabel = "Set Packing Spot",
-                    defaultDesc = "Set new packing spot for this caravan.",
+                    defaultLabel = "ECAG_SetHitchingSpot".Translate(),
+                    defaultDesc = "ECAG_SetHitchingSpot_desc".Translate(),
                     icon = SetPackingSpotIcon,
                     action = () =>
                     {
@@ -142,8 +142,8 @@ namespace EasyCaravanAndGo
 
                 newGizmos.Add(new Command_Action
                 {
-                    defaultLabel = "Select Exit Cell",
-                    defaultDesc = "Choose a location on the map edge where the caravan should exit.",
+                    defaultLabel = "ECAG_SetExitCell".Translate(),
+                    defaultDesc = "ECAG_SetExitCell_desc".Translate(),
                     icon = SetExitSpotIcon,
                     action = () =>
                     {
@@ -167,12 +167,13 @@ namespace EasyCaravanAndGo
 
                 newGizmos.Add(new Command_Action
                 {
-                    defaultLabel = "Caravan Leave",
-                    defaultDesc = "Force the caravan to leave now.",
+                    defaultLabel = "ECAG_CaravanLeave".Translate(),
+                    defaultDesc = "ECAG_CaravanLeave_desc".Translate(),
                     icon = CaravanLeaveIcon,
                     action = () =>
                     {
                         lord.ReceiveMemo("CaravanLeaveNow");
+                        Messages.Message("ECAG_CravanLeaveForced".Translate(), MessageTypeDefOf.CautionInput);
                     }
                 });
 
@@ -182,8 +183,8 @@ namespace EasyCaravanAndGo
             {
                 var formCaravanCommand = new Command_Action
                 {
-                    defaultLabel = "Form Caravan",
-                    defaultDesc = "Form a caravan that only includes this pawn",
+                    defaultLabel = "ECAG_FormCaravan".Translate(),
+                    defaultDesc = "ECAG_FormCaravan_desc".Translate(),
                     icon = FormCaravanIcon,
                     action = () =>
                     {
@@ -286,12 +287,11 @@ namespace EasyCaravanAndGo
                     lord.ReceiveMemo("CaravanBackToGatherAnimals");
                 }
 
-                Messages.Message("Caravan packing spot set to " + packingSpot, MessageTypeDefOf.PositiveEvent);
-
+                Messages.Message("ECAG_HitchingSpotUpdated".Translate(), MessageTypeDefOf.PositiveEvent);
             }
             else
             {
-                Log.Warning("Patching packing spot failed: No lord or toilsToPatch does not contain this LoardJob");
+                Log.Warning("Patching packing spot failed: No lord, or toilsToPatch does not contain this LoardJob");
             }
         }
 
@@ -311,7 +311,7 @@ namespace EasyCaravanAndGo
 
                 lordJob.lord?.ReceiveMemo("CaravanBackToGatherDownedPawns");
 
-                Messages.Message("Caravan exit set to " + exitSpot, MessageTypeDefOf.PositiveEvent);
+                Messages.Message("ECAG_CravanExitUpdated".Translate(), MessageTypeDefOf.PositiveEvent);
             }
             else
             {
