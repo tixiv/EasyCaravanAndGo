@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <ModMetaData>
-    <name>Easy Caravan and go!</name>
+    <name>Easy Caravan and Go!</name>
     <author>Tixiv</author>
     <url>https://github.com/tixiv/EasyCaravanAndGo</url>
     <packageId>Tixiv.EasyCaravanAndGo</packageId>
@@ -8,12 +8,29 @@
         <li>1.5</li>
     </supportedVersions>
 <description>
-A quality of life mod for Rimworld. Have you ever gotten sick of needing to click through the world, remember the pawn you wanted to use, and then form a caravan, just to collect some stuff at the edge of your map?
+Easy Caravan and Go!
 
-Ever had a different playstile, and wanted to quickly abandon the colony into a caravan, but everyone would run right into the enemies or wait around when forming it?
+Take your caravans into your own hands.
+A quality-of-life mod for RimWorld.
 
-This mod helps with these problem! When any colonist is drafted you now have a button to start forming a caravan immediately! No selecting where to go or what to take! Just "add to caravan" the items that you want and go! When a colonist is forming the caravan, if you draft them you now get the option to click on a map edge to have them leave there and form the carava. Colonists need to leave in different directions? No Problem! Just merge your caravans once they are on the world (and of course tell them where to go now).
 
+Feature details:
+
+- Adds a button on the pawns UI to from a caravan immediately. It will use the pawns current position as the initial hitching spot and wait for orders on the world map once formed. Once forming a caravan there will be three additional buttons on the caravaning pawns UI:
+
+- "Set hitching spot" Sets a new hitching spot location. Usefull if you need to pack stuff onto animals at multiple locations.
+
+- "Set exit spot" Sets the spot where the caravan will leave the map. Usefull to evade enemies in emergency situations. Can be used at any time in the caravan forming process.
+
+- "Caravan go!" Forces the caravan to skip packing the rest of the stuff and just take the animals, if any, and go. Also usefull for emergency situations. If you are taking downed pawns on your caravan be sure to carry them to the exit spot manually. Otherwise the caravan won't take them!
+
+Game bugs fixed with this mod:
+
+- "Load x onto caravan" float menu command would normally load things only onto pack animals when any where assigned to the caravan, not onto the colonist themselves. When the animals where "full" you couldn't pack any more stuff. This mod fixes this by putting additional things into the pawns inventory as soon as the animal with the most free space has less than 2 weight units of space left.
+
+- Downed pawns would be carried to a location too far away from the map edge and wouldn't be taken by the caravan.
+
+- If you carried a downed pawn manually that belongs to a caravan, the game would bug out with errors when the caravaning pawns wanted to carry the downed pawn to the exit. This is now fixed by skipping that pawn if it is being manually carried. You can still take downed pawns by carrying them to the caravan exit manually before the caravan leaves. You can delay the cravan from leaving in this case by drafting any caravan pawn before they reach the exit spot.
 </description>
     <modDependencies>
         <li>
