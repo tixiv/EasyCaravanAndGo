@@ -180,7 +180,7 @@ namespace EasyCaravanAndGo
 
                 __result = newGizmos;
             }
-            else if (!pawn.NonHumanlikeOrWildMan() && !CaravanFormingUtility.IsFormingCaravanOrDownedPawnToBeTakenByCaravan(pawn))
+            else if (!pawn.NonHumanlikeOrWildMan() && pawn.IsFreeNonSlaveColonist && !CaravanFormingUtility.IsFormingCaravanOrDownedPawnToBeTakenByCaravan(pawn))
             {
                 var formCaravanCommand = new Command_Action
                 {
