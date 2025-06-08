@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 
 <LanguageData>
+  <!-- Gizmos -->
   <ECAG_FormCaravan>Form caravan</ECAG_FormCaravan>
   <ECAG_FormCaravan_desc>Form a caravan now that only includes this pawn.",</ECAG_FormCaravan_desc>
   <ECAG_SetHitchingSpot>Set hitching spot</ECAG_SetHitchingSpot>
@@ -10,7 +11,30 @@
   <ECAG_CaravanLeave>Caravan go!</ECAG_CaravanLeave>
   <ECAG_CaravanLeave_desc>Force the caravan to leave now. Animals will be taken, but items not packed yet will be left.</ECAG_CaravanLeave_desc>
   
+  <!-- Messages -->
   <ECAG_HitchingSpotUpdated>Caravan hitching spot updated.</ECAG_HitchingSpotUpdated>
   <ECAG_CravanExitUpdated>Caravan exit updated.</ECAG_CravanExitUpdated>
   <ECAG_CravanLeaveForced>Caravan forced to leave.</ECAG_CravanLeaveForced>
+  
+  <!-- Mod settings -->
+  <ECAG_EnableFormCaravanButton>Enable "Form caravan" button</ECAG_EnableFormCaravanButton>
+  
+  <ECAG_EnableLordPatches>Enable lord job patches</ECAG_EnableLordPatches>
+  <ECAG_EnableLordPatches_desc>This enables patches to the caravan forming lord job, which allows this mod to add the following three buttons. This is made optional here because these are the most invasive patches this mod does that could cause compatibility problems.
+  You need to restart the game for this setting to take effect. Also make sure no caravan is forming in your savegame while changing it.</ECAG_EnableLordPatches_desc>
+
+  <ECAG_EnableSetHitchingSpotButton>Enable "Set hitching spot" button</ECAG_EnableSetHitchingSpotButton>
+  <ECAG_EnableSetCaravanExitButton>Enable "Set caravan exit" button</ECAG_EnableSetCaravanExitButton>
+  <ECAG_EnableCaravanGoButton>Enable "Caravan go!" button</ECAG_EnableCaravanGoButton>
+  
+  <ECAG_EnableLoadOnCaravanFix>Enable "load on caravan" fix</ECAG_EnableLoadOnCaravanFix>
+  <ECAG_EnableLoadOnCaravanFix_desc>This enables a fix for a bug in the base game's "load x onto caravan" function: When the caravan has pack animals assigned, the colonists will only load items onto the animals through the "load onto caravan" function, not onto the colonist themselves. The colonists carrying capacity can't be used. This fix will now also load things onto the colonist themselves whenever the pack animal with the most free space left has less than 2 weight units of space.
+  You need to restart the game for this setting to take effect.</ECAG_EnableLoadOnCaravanFix_desc>
+  
+  <ECAG_EnableGatherDownedPawnsFixes>Enable downed pawn fixes</ECAG_EnableGatherDownedPawnsFixes>
+  <ECAG_EnableGatherDownedPawnsFixes_desc>This will enable two fixes for taking downed colonists onto a caravan. The game sometimes "forgets" to take a downed colonist on a caravan, because they are placed too far away from the exit spot. This will be fixed by increasing the allowed radius around the exit spot slightly. The second fix regards carrying downed pawns manually to the caravan exit spot. The base game will throw errors when you carry a downed pawn manually while another caravaning colonist is also trying to carry them to the exit spot. This is fixed by skipping the downed pawn regarding the caravan forming. You can still take them on the caravan by carrying them to a location near the exit spot manually before the caravan leaves.
+  You need to restart the game for this setting to take effect.</ECAG_EnableGatherDownedPawnsFixes_desc>
+  
+  <ECAG_GameRestartRequired>You need to restart Rimworld for the changes to take effect.</ECAG_GameRestartRequired> 
+  <ECAG_MakeSureNoCarvanIsForming>Make sure that no caravan is forming in your savegame!</ECAG_MakeSureNoCarvanIsForming> 
 </LanguageData>

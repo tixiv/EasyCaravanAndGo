@@ -23,27 +23,53 @@ namespace EasyCaravanAndGo
     [StaticConstructorOnStartup]
     public static class EasyCaravanAndGo
     {
+        static bool haveLordPatch = false;
+
         static EasyCaravanAndGo()
         {
             var harmony = new Harmony("com.Tixiv.EasyCaravanAndGo");
 
+            // Always patch GetGizmos: We probably want to add buttons, but otherwise this
+            // patch is very compatible as it only adds buttons when needed.
+
             harmony.Patch(AccessTools.Method(typeof(CaravanFormingUtility), nameof(CaravanFormingUtility.GetGizmos)),
                 postfix: new HarmonyMethod(typeof(EasyCaravanAndGo), nameof(EasyCaravanAndGo.GetGizmos_Postfix)));
 
-            harmony.Patch(AccessTools.Method(typeof(LordJob_FormAndSendCaravan), nameof(LordJob_FormAndSendCaravan.CreateGraph)),
-                postfix: new HarmonyMethod(typeof(EasyCaravanAndGo), nameof(EasyCaravanAndGo.CreateGraph_Postfix)));
+            if (EasyCaravanAndGo_Settings.enableLordPatches)
+            {
+                toilsToPatch = new Dictionary<LordJob_FormAndSendCaravan, ToilsToPatch>();
 
-            harmony.Patch(AccessTools.Method(typeof(LordJob_FormAndSendCaravan), "SendCaravan"),
-                prefix: new HarmonyMethod(typeof(EasyCaravanAndGo), nameof(EasyCaravanAndGo.SendCaravan_Prefix)));
+                harmony.Patch(AccessTools.Method(typeof(LordJob_FormAndSendCaravan), nameof(LordJob_FormAndSendCaravan.CreateGraph)),
+                    postfix: new HarmonyMethod(typeof(EasyCaravanAndGo), nameof(EasyCaravanAndGo.CreateGraph_Postfix)));
 
-            harmony.Patch(AccessTools.Method(typeof(GiveToPackAnimalUtility), nameof(GiveToPackAnimalUtility.UsablePackAnimalWithTheMostFreeSpace)),
-                postfix: new HarmonyMethod(typeof(EasyCaravanAndGo), nameof(EasyCaravanAndGo.UsablePackAnimalWithTheMostFreeSpace_Postfix)));
+                harmony.Patch(AccessTools.Method(typeof(LordJob_FormAndSendCaravan), "SendCaravan"),
+                    prefix: new HarmonyMethod(typeof(EasyCaravanAndGo), nameof(EasyCaravanAndGo.SendCaravan_Prefix)));
 
-            Patch_GatherDownedPawns.Patch(harmony);
 
-            harmony.PatchAll();
+                harmony.Patch(AccessTools.Method(typeof(FloatMenuMakerMap), "AddHumanlikeOrders"),
+                    prefix: new HarmonyMethod(typeof(EasyCaravanAndGo), nameof(EasyCaravanAndGo.AddHumanlikeOrders_Prefix)),
+                    transpiler: new HarmonyMethod(typeof(EasyCaravanAndGo), nameof(EasyCaravanAndGo.AddHumanlikeOrders_Transpiler)),
+                    postfix: new HarmonyMethod(typeof(EasyCaravanAndGo), nameof(EasyCaravanAndGo.AddHumanlikeOrders_Postfix)));
 
-            toilsToPatch = new Dictionary<LordJob_FormAndSendCaravan, ToilsToPatch>();
+                harmony.Patch(AccessTools.Method(typeof(LordToil_PrepareCaravan_GatherItems), nameof(LordToil_PrepareCaravan_GatherItems.LordToilTick)),
+                    prefix: new HarmonyMethod(typeof(EasyCaravanAndGo), nameof(EasyCaravanAndGo.LordToil_GatherItems_Prefix)));
+
+                // Save this in case it is changed through the mod menu. Then we won't bug out if
+                // the player keeps on playing after enabling it in the mod menu. We just won't display
+                // the buttons as long as the LordJob patch isn't done.
+                haveLordPatch = true;
+            }
+
+            if (EasyCaravanAndGo_Settings.enableLoadOnCaravanFix)
+            {
+                harmony.Patch(AccessTools.Method(typeof(GiveToPackAnimalUtility), nameof(GiveToPackAnimalUtility.UsablePackAnimalWithTheMostFreeSpace)),
+                    postfix: new HarmonyMethod(typeof(EasyCaravanAndGo), nameof(EasyCaravanAndGo.UsablePackAnimalWithTheMostFreeSpace_Postfix)));
+            }
+
+            if (EasyCaravanAndGo_Settings.enableGatherDownedPawnsFixes)
+            {
+                Patch_GatherDownedPawns.Patch(harmony);
+            }
         }
 
         public static IntVec3? TryFindExitSpot(Map map, List<Pawn> pawns, int startingTile)
@@ -67,7 +93,6 @@ namespace EasyCaravanAndGo
             return (IntVec3)parameters[2]; // out parameter is modified in-place
         }
 
-
         public static TargetingParameters CaravanExitTargetParams()
         {
             return new TargetingParameters
@@ -85,6 +110,7 @@ namespace EasyCaravanAndGo
                 }
             };
         }
+
         public static TargetingParameters CaravanPackingTargetParams()
         {
             return new TargetingParameters
@@ -116,71 +142,85 @@ namespace EasyCaravanAndGo
 
             if (lord != null && lord.LordJob is LordJob_FormAndSendCaravan lordJob)
             {
-                newGizmos.Add(new Command_Action
+                if (haveLordPatch)
                 {
-                    defaultLabel = "ECAG_SetHitchingSpot".Translate(),
-                    defaultDesc = "ECAG_SetHitchingSpot_desc".Translate(),
-                    icon = SetPackingSpotIcon,
-                    action = () =>
+                    if (EasyCaravanAndGo_Settings.enableSetHitchingSpotButton)
                     {
-                        TargetingParameters targetParams = CaravanPackingTargetParams();
-
-                        void action(LocalTargetInfo target)
+                        newGizmos.Add(new Command_Action
                         {
-                            PatchPackingSpot(lordJob, target.Cell);
-                        }
+                            defaultLabel = "ECAG_SetHitchingSpot".Translate(),
+                            defaultDesc = "ECAG_SetHitchingSpot_desc".Translate(),
+                            icon = SetPackingSpotIcon,
+                            action = () =>
+                            {
+                                TargetingParameters targetParams = CaravanPackingTargetParams();
 
-                        Find.Targeter.BeginTargeting(
-                            targetParams,
-                            action,
-                            null,
-                            null,
-                            TexCommand.Attack, // or null for default
-                            true
-                        );
+                                void action(LocalTargetInfo target)
+                                {
+                                    PatchPackingSpot(lordJob, target.Cell);
+                                }
+
+                                Find.Targeter.BeginTargeting(
+                                    targetParams,
+                                    action,
+                                    null,
+                                    null,
+                                    TexCommand.Attack, // or null for default
+                                    true
+                                );
+                            }
+                        });
                     }
-                });
 
-                newGizmos.Add(new Command_Action
-                {
-                    defaultLabel = "ECAG_SetExitCell".Translate(),
-                    defaultDesc = "ECAG_SetExitCell_desc".Translate(),
-                    icon = SetExitSpotIcon,
-                    action = () =>
+                    if (EasyCaravanAndGo_Settings.enableSetCaravanExitButton)
                     {
-                        TargetingParameters targetParams = CaravanExitTargetParams();
-
-                        void targeterAction(LocalTargetInfo target)
+                        newGizmos.Add(new Command_Action
                         {
-                            PatchExitSpot(lordJob, target.Cell);
-                        }
+                            defaultLabel = "ECAG_SetExitCell".Translate(),
+                            defaultDesc = "ECAG_SetExitCell_desc".Translate(),
+                            icon = SetExitSpotIcon,
+                            action = () =>
+                            {
+                                TargetingParameters targetParams = CaravanExitTargetParams();
 
-                        Find.Targeter.BeginTargeting(
-                            targetParams,
-                            targeterAction,
-                            null,
-                            null,
-                            TexCommand.Attack, // or null for default
-                            true
-                        );
+                                void targeterAction(LocalTargetInfo target)
+                                {
+                                    PatchExitSpot(lordJob, target.Cell);
+                                }
+
+                                Find.Targeter.BeginTargeting(
+                                    targetParams,
+                                    targeterAction,
+                                    null,
+                                    null,
+                                    TexCommand.Attack, // or null for default
+                                    true
+                                );
+                            }
+                        });
                     }
-                });
 
-                newGizmos.Add(new Command_Action
-                {
-                    defaultLabel = "ECAG_CaravanLeave".Translate(),
-                    defaultDesc = "ECAG_CaravanLeave_desc".Translate(),
-                    icon = CaravanLeaveIcon,
-                    action = () =>
+                    if (EasyCaravanAndGo_Settings.enableCaravanGoButton)
                     {
-                        lord.ReceiveMemo("CaravanLeaveNow");
-                        Messages.Message("ECAG_CravanLeaveForced".Translate(), MessageTypeDefOf.CautionInput);
+                        newGizmos.Add(new Command_Action
+                        {
+                            defaultLabel = "ECAG_CaravanLeave".Translate(),
+                            defaultDesc = "ECAG_CaravanLeave_desc".Translate(),
+                            icon = CaravanLeaveIcon,
+                            action = () =>
+                            {
+                                lord.ReceiveMemo("CaravanLeaveNow");
+                                Messages.Message("ECAG_CravanLeaveForced".Translate(), MessageTypeDefOf.CautionInput);
+                            }
+                        });
                     }
-                });
 
-                __result = newGizmos;
+                    __result = newGizmos;
+                }
             }
-            else if (!pawn.NonHumanlikeOrWildMan() && pawn.IsFreeNonSlaveColonist && !CaravanFormingUtility.IsFormingCaravanOrDownedPawnToBeTakenByCaravan(pawn))
+            else if (EasyCaravanAndGo_Settings.enableFormCaravanButton &&
+                !pawn.NonHumanlikeOrWildMan() && pawn.IsFreeNonSlaveColonist &&
+                !CaravanFormingUtility.IsFormingCaravanOrDownedPawnToBeTakenByCaravan(pawn))
             {
                 var formCaravanCommand = new Command_Action
                 {
@@ -195,11 +235,10 @@ namespace EasyCaravanAndGo
                             return;
                         }
 
-                        List<Pawn> pawns = new List<Pawn>();
-                        pawns.Add(pawn);
+                        List<Pawn> pawns = new List<Pawn> {pawn};
 
                         int startingTile = pawn.Map.Parent.Tile;
-                        int destinationTile = -1;
+                        int destinationTile = -1; // destinationTile value of -1 will make the caravan wait on top of the colony
 
                         var exitSpot = TryFindExitSpot(pawn.Map, pawns, startingTile);
                         if (exitSpot.HasValue)
@@ -407,58 +446,26 @@ namespace EasyCaravanAndGo
             return true;
         }
 
-        public static void UsablePackAnimalWithTheMostFreeSpace_Postfix(Pawn pawn, ref Pawn __result)
+        // Static class to track the float menu options we want to modify
+        public static class FloatMenuOptionTracker
         {
-            // This fixes a  - bug I guess I would call it - in Rimworld where
-            // when you "load onto caravan" things manually and you have pack animals, it
-            // will never consider loading stuff onto the pawn itself. The result is that
-            // You can load up your animals just fine, but you can't utilise the pawns
-            // carrying capacity.
-            // This attempts to work around this in a slightly dirty way: we check whether the
-            // animal is "full" (less than 2 weight units left) and the pawn itself could carry more.
-            // In that case we return null here so 'MenuMakerMap::AddHumalikeOrders()' will
-            // choose the pawn itself because there "are no suitable carrier animals".
+            public static List<FloatMenuOption> lastLoadIntoCaravan;
+            public static List<FloatMenuOption> lastLoadIntoCaravanAll;
+            public static List<FloatMenuOption> lastLoadIntoCaravanSome;
 
-            if (__result != null && pawn != null)
+            public static void TrackLoadIntoCaravan(FloatMenuOption opt) { lastLoadIntoCaravan.Add(opt); }
+            public static void TrackLoadIntoCaravanAll(FloatMenuOption opt) { lastLoadIntoCaravanAll.Add(opt); }
+            public static void TrackLoadIntoCaravanSome(FloatMenuOption opt) { lastLoadIntoCaravanSome.Add(opt); }
+
+            public static void Clear()
             {
-
-                float pawnCapacity = MassUtility.FreeSpace(pawn);
-                float animalCapacity = MassUtility.FreeSpace(__result);
-
-                if (animalCapacity < 2.0f && animalCapacity < pawnCapacity)
-                { 
-                    __result = null;
-                }
+                lastLoadIntoCaravan = new List<FloatMenuOption>();
+                lastLoadIntoCaravanAll = new List<FloatMenuOption>();
+                lastLoadIntoCaravanSome = new List<FloatMenuOption>();
             }
         }
-    }
 
-
-    // Static class to track the float menu options we want to modify
-    public static class FloatMenuOptionTracker
-    {
-        public static List<FloatMenuOption> lastLoadIntoCaravan;
-        public static List<FloatMenuOption> lastLoadIntoCaravanAll;
-        public static List<FloatMenuOption> lastLoadIntoCaravanSome;
-
-        public static void TrackLoadIntoCaravan(FloatMenuOption opt) { lastLoadIntoCaravan.Add(opt); }
-        public static void TrackLoadIntoCaravanAll(FloatMenuOption opt) { lastLoadIntoCaravanAll.Add(opt); }
-        public static void TrackLoadIntoCaravanSome(FloatMenuOption opt) { lastLoadIntoCaravanSome.Add(opt); }
-
-        public static void Clear()
-        {
-            lastLoadIntoCaravan = new List<FloatMenuOption>();
-            lastLoadIntoCaravanAll = new List<FloatMenuOption>();
-            lastLoadIntoCaravanSome = new List<FloatMenuOption>();
-        }
-    }
-
-    [HarmonyPatch(typeof(FloatMenuMakerMap), "AddHumanlikeOrders")]
-    public static class Patch_AddHumanlikeOrders
-    {
-        // Transpiler to intercept and track the FloatMenuOption
-        [HarmonyTranspiler]
-        public static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+        public static IEnumerable<CodeInstruction> AddHumanlikeOrders_Transpiler(IEnumerable<CodeInstruction> instructions)
         {
             int phase = 0;
 
@@ -517,15 +524,13 @@ namespace EasyCaravanAndGo
             }
         }
 
-        [HarmonyPrefix]
-        public static bool Prefix(Vector3 clickPos, Pawn pawn, List<FloatMenuOption> opts)
+        public static bool AddHumanlikeOrders_Prefix(Vector3 clickPos, Pawn pawn, List<FloatMenuOption> opts)
         {
             FloatMenuOptionTracker.Clear();
             return true;
         }
 
-        [HarmonyPostfix]
-        public static void Postfix(Vector3 clickPos, Pawn pawn, List<FloatMenuOption> opts)
+        public static void AddHumanlikeOrders_Postfix(Vector3 clickPos, Pawn pawn, List<FloatMenuOption> opts)
         {
             void patchOption(FloatMenuOption option)
             {
@@ -555,20 +560,15 @@ namespace EasyCaravanAndGo
 
             FloatMenuOptionTracker.Clear();
         }
-    }
 
-    // This patch changes the behaviour of the gather items lord toil so that the caravan forming
-    // will remain in the state "gather items" as long as any caravan pawns still have one of these
-    // two jobs, which are assigned to them when you load stuff onto an existing caravan through the float menu.
-    // This is very helpfull if the caravan has pack animals, because it stops the caravan forming from progressing
-    // to "collect animals" while you are still manually loading stuff on them.
-
-    [HarmonyPatch(typeof(LordToil_PrepareCaravan_GatherItems), nameof(LordToil_PrepareCaravan_GatherItems.LordToilTick))]
-    public static class Patch_LordToil_GatherItems
-    {
-        [HarmonyPrefix]
-        public static bool Prefix(LordToil_PrepareCaravan_GatherItems __instance)
+        public static bool LordToil_GatherItems_Prefix(LordToil_PrepareCaravan_GatherItems __instance)
         {
+            // This patch changes the behaviour of the gather items lord toil so that the caravan forming
+            // will remain in the state "gather items" as long as any caravan pawns still have one of these
+            // two jobs, which are assigned to them when you load stuff onto an existing caravan through the float menu.
+            // This is very helpfull if the caravan has pack animals, because it stops the caravan forming from progressing
+            // to "collect animals" while you are still manually loading stuff on them.
+
             if (Find.TickManager.TicksGame % 120 == 0)
             {
                 foreach (Pawn p in __instance.lord.ownedPawns)
@@ -580,6 +580,31 @@ namespace EasyCaravanAndGo
             }
 
             return true;
+        }
+
+        public static void UsablePackAnimalWithTheMostFreeSpace_Postfix(Pawn pawn, ref Pawn __result)
+        {
+            // This fixes a  - bug I guess I would call it - in Rimworld where
+            // when you "load onto caravan" things manually and you have pack animals, it
+            // will never consider loading stuff onto the pawn itself. The result is that
+            // You can load up your animals just fine, but you can't utilise the pawns
+            // carrying capacity.
+            // This attempts to work around this in a slightly dirty way: we check whether the
+            // animal is "full" (less than 2 weight units left) and the pawn itself could carry more.
+            // In that case we return null here so 'MenuMakerMap::AddHumalikeOrders()' will
+            // choose the pawn itself because there "are no suitable carrier animals".
+
+            if (__result != null && pawn != null)
+            {
+
+                float pawnCapacity = MassUtility.FreeSpace(pawn);
+                float animalCapacity = MassUtility.FreeSpace(__result);
+
+                if (animalCapacity < 2.0f && animalCapacity < pawnCapacity)
+                {
+                    __result = null;
+                }
+            }
         }
     }
 }
