@@ -39,17 +39,44 @@ namespace EasyCaravanAndGo
             {
                 toilsToPatch = new Dictionary<LordJob_FormAndSendCaravan, ToilsToPatch>();
 
+                // Log.Message("Patch CreateGraph");
+
                 harmony.Patch(AccessTools.Method(typeof(LordJob_FormAndSendCaravan), nameof(LordJob_FormAndSendCaravan.CreateGraph)),
                     postfix: new HarmonyMethod(typeof(EasyCaravanAndGo), nameof(EasyCaravanAndGo.CreateGraph_Postfix)));
+
+                // Log.Message("Patch SendCaravan");
 
                 harmony.Patch(AccessTools.Method(typeof(LordJob_FormAndSendCaravan), "SendCaravan"),
                     prefix: new HarmonyMethod(typeof(EasyCaravanAndGo), nameof(EasyCaravanAndGo.SendCaravan_Prefix)));
 
 
+#if RIMWORLD_1_5
+
+                // Log.Message("Patch AddHumanlikeOrders");
+
                 harmony.Patch(AccessTools.Method(typeof(FloatMenuMakerMap), "AddHumanlikeOrders"),
                     prefix: new HarmonyMethod(typeof(EasyCaravanAndGo), nameof(EasyCaravanAndGo.AddHumanlikeOrders_Prefix)),
                     transpiler: new HarmonyMethod(typeof(EasyCaravanAndGo), nameof(EasyCaravanAndGo.AddHumanlikeOrders_Transpiler)),
                     postfix: new HarmonyMethod(typeof(EasyCaravanAndGo), nameof(EasyCaravanAndGo.AddHumanlikeOrders_Postfix)));
+
+#elif RIMWORLD_1_6
+
+                // Log.Message("Patch GetOptionsFor");
+
+                var subtype = typeof(FloatMenuOptionProvider_LoadCaravan).GetNestedTypes(BindingFlags.NonPublic).FirstOrDefault(t => t.Name.Contains("<GetOptionsFor>"));
+                if (subtype != null)
+                    harmony.Patch(AccessTools.Method(subtype, "MoveNext"),
+                        // prefix: new HarmonyMethod(typeof(EasyCaravanAndGo), nameof(EasyCaravanAndGo.GetOptionsFor_Prefix)),
+                        transpiler: new HarmonyMethod(typeof(EasyCaravanAndGo), nameof(EasyCaravanAndGo.AddHumanlikeOrders_Transpiler))
+                        // postfix: new HarmonyMethod(typeof(EasyCaravanAndGo), nameof(EasyCaravanAndGo.GetOptionsFor_Postfix))
+                        );
+                else
+                    Log.Warning("Couldn't apply FloatMenuOptionProvider_LoadCaravan.GetOptionsFor patch");
+                
+
+#endif                
+
+                // Log.Message("Patch LordToilTick");
 
                 harmony.Patch(AccessTools.Method(typeof(LordToil_PrepareCaravan_GatherItems), nameof(LordToil_PrepareCaravan_GatherItems.LordToilTick)),
                     prefix: new HarmonyMethod(typeof(EasyCaravanAndGo), nameof(EasyCaravanAndGo.LordToil_GatherItems_Prefix)));
@@ -79,9 +106,13 @@ namespace EasyCaravanAndGo
             // We instantiate the dialog here because the method we need is an instance method
             Dialog_FormCaravan fakeDialog = new Dialog_FormCaravan(map);
 
+#if RIMWORLD_1_5
             // set the private 'startingTile'
             AccessTools.Field(typeof(Dialog_FormCaravan), "startingTile").SetValue(fakeDialog, startingTile);
-
+#elif RIMWORLD_1_6
+            // set the private 'startingTile'
+            AccessTools.Field(typeof(Dialog_FormCaravan), "startingTile").SetValue(fakeDialog, new PlanetTile(startingTile));
+#endif
             var method = AccessTools.Method(typeof(Dialog_FormCaravan), "TryFindExitSpot",
                 new Type[] { typeof(List<Pawn>), typeof(bool), typeof(IntVec3).MakeByRefType() });
 
@@ -465,6 +496,37 @@ namespace EasyCaravanAndGo
             }
         }
 
+        public static void patchOptions(Pawn pawn)
+        {
+            void patchOption(FloatMenuOption option)
+            {
+                if (option.action != null)
+                {
+                    Action originalAction = option.action;
+
+                    void newAction()
+                    {
+                        originalAction();
+
+                        pawn?.GetLord()?.ReceiveMemo("CaravanBackToGatherItems");
+                    }
+
+                    option.action = newAction;
+                }
+            }
+
+            foreach (FloatMenuOption option in FloatMenuOptionTracker.lastLoadIntoCaravan)
+                patchOption(option);
+
+            foreach (FloatMenuOption option in FloatMenuOptionTracker.lastLoadIntoCaravanAll)
+                patchOption(option);
+
+            foreach (FloatMenuOption option in FloatMenuOptionTracker.lastLoadIntoCaravanSome)
+                patchOption(option);
+
+            FloatMenuOptionTracker.Clear();
+        }
+
         public static IEnumerable<CodeInstruction> AddHumanlikeOrders_Transpiler(IEnumerable<CodeInstruction> instructions)
         {
             int phase = 0;
@@ -524,6 +586,8 @@ namespace EasyCaravanAndGo
             }
         }
 
+#if RIMWORLD_1_5
+
         public static bool AddHumanlikeOrders_Prefix(Vector3 clickPos, Pawn pawn, List<FloatMenuOption> opts)
         {
             FloatMenuOptionTracker.Clear();
@@ -532,34 +596,23 @@ namespace EasyCaravanAndGo
 
         public static void AddHumanlikeOrders_Postfix(Vector3 clickPos, Pawn pawn, List<FloatMenuOption> opts)
         {
-            void patchOption(FloatMenuOption option)
-            {
-                if (option.action != null)
-                {
-                    Action originalAction = option.action;
-
-                    void newAction()
-                    {
-                        originalAction();
-
-                        pawn?.GetLord()?.ReceiveMemo("CaravanBackToGatherItems");
-                    }
-
-                    option.action = newAction;
-                }
-            }
-
-            foreach (FloatMenuOption option in FloatMenuOptionTracker.lastLoadIntoCaravan)
-                patchOption(option);
-
-            foreach (FloatMenuOption option in FloatMenuOptionTracker.lastLoadIntoCaravanAll)
-                patchOption(option);
-
-            foreach (FloatMenuOption option in FloatMenuOptionTracker.lastLoadIntoCaravanSome)
-                patchOption(option);
-
-            FloatMenuOptionTracker.Clear();
+            patchOptions(pawn);
         }
+
+#elif RIMWORLD_1_6
+
+        public static bool GetOptionsFor_Prefix(ref IEnumerable<FloatMenuOption> __result, Thing clickedThing, FloatMenuContext context)
+        {
+            FloatMenuOptionTracker.Clear();
+            return true;
+        }
+        public static void GetOptionsFor_Postfix(ref IEnumerable<FloatMenuOption> __result, Thing clickedThing, FloatMenuContext context)
+        {
+            patchOptions(context.FirstSelectedPawn);
+        }
+
+#endif
+
 
         public static bool LordToil_GatherItems_Prefix(LordToil_PrepareCaravan_GatherItems __instance)
         {

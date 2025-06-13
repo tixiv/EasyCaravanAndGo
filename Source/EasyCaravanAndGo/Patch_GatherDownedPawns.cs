@@ -17,20 +17,36 @@ namespace EasyCaravanAndGo
     {
         public static void Patch(Harmony harmony)
         {
+            // Log.Message("Patch IsDownedPawnNearExitPoint");
+
             harmony.Patch(AccessTools.Method(typeof(JobGiver_PrepareCaravan_GatherDownedPawns), "IsDownedPawnNearExitPoint"),
                 prefix: new HarmonyMethod(typeof(Patch_GatherDownedPawns), nameof(Patch_GatherDownedPawns.IsDownedPawnNearExitPoint)));
+
+            // Log.Message("Patch FindDownedPawn");
 
             harmony.Patch(AccessTools.Method(typeof(JobGiver_PrepareCaravan_GatherDownedPawns), "FindDownedPawn"),
                 transpiler: new HarmonyMethod(typeof(Patch_GatherDownedPawns), nameof(Patch_GatherDownedPawns.Transpiler_JobGiver)));
 
+            // Log.Message("Patch CheckAllPawnsArrived");
+
             harmony.Patch(AccessTools.Method(typeof(LordToil_PrepareCaravan_GatherDownedPawns), "CheckAllPawnsArrived"),
                 transpiler: new HarmonyMethod(typeof(Patch_GatherDownedPawns), nameof(Patch_GatherDownedPawns.Transpiler_LordToil)));
 
+            // Log.Message("Patch ExitMapAndCreateCaravan");
+
+#if RIMWORLD_1_5
 
             harmony.Patch(AccessTools.Method(typeof(CaravanExitMapUtility), nameof(CaravanExitMapUtility.ExitMapAndCreateCaravan),
                 new Type[] {typeof(IEnumerable<Pawn>), typeof(Faction), typeof(int) /* exitFromTile */, typeof(int) /* directionTile */,
                     typeof(int) /* destinationTile */, typeof(bool) /* sendMessage */ }),
                 prefix: new HarmonyMethod(typeof(Patch_GatherDownedPawns), nameof(ExitMapAndCreateCaravan_Prefix)));
+#elif RIMWORLD_1_6
+
+            harmony.Patch(AccessTools.Method(typeof(CaravanExitMapUtility), nameof(CaravanExitMapUtility.ExitMapAndCreateCaravan),
+                new Type[] {typeof(IEnumerable<Pawn>), typeof(Faction), typeof(PlanetTile) /* exitFromTile */, typeof(PlanetTile) /* directionTile */,
+                    typeof(PlanetTile) /* destinationTile */, typeof(bool) /* sendMessage */ }),
+                prefix: new HarmonyMethod(typeof(Patch_GatherDownedPawns), nameof(ExitMapAndCreateCaravan_Prefix)));
+#endif
         }
 
 
