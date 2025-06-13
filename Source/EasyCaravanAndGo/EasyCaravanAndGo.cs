@@ -63,10 +63,10 @@ namespace EasyCaravanAndGo
 
                 // Log.Message("Patch GetOptionsFor");
 
-                var subtype = typeof(FloatMenuOptionProvider_LoadCaravan).GetNestedTypes(BindingFlags.NonPublic).FirstOrDefault(t => t.Name.Contains("<GetOptionsFor>"));
-                if (subtype != null)
+                var getOptionsFor = typeof(FloatMenuOptionProvider_LoadCaravan).GetNestedTypes(BindingFlags.NonPublic).FirstOrDefault(t => t.Name.Contains("<GetOptionsFor>"));
+                if (getOptionsFor != null)
                 {
-                    harmony.Patch(AccessTools.Method(subtype, "MoveNext"),
+                    harmony.Patch(AccessTools.Method(getOptionsFor, "MoveNext"),
                         transpiler: new HarmonyMethod(typeof(EasyCaravanAndGo), nameof(EasyCaravanAndGo.AddHumanlikeOrders_Transpiler)));
 
                     harmony.Patch(AccessTools.Method(typeof(FloatMenuMakerMap), nameof(FloatMenuMakerMap.GetOptions)),
@@ -102,6 +102,22 @@ namespace EasyCaravanAndGo
             {
                 Patch_GatherDownedPawns.Patch(harmony);
             }
+
+#if RIMWORLD_1_6
+            if (EasyCaravanAndGo_Settings.disableForceCaravanDepartureButton)
+            {
+                var getGizmos = typeof(CaravanFormingUtility).GetNestedTypes(BindingFlags.NonPublic).FirstOrDefault(t => t.Name.Contains("<GetGizmos>"));
+                if (getGizmos != null)
+                {
+                    harmony.Patch(AccessTools.Method(getGizmos, "MoveNext"),
+                        transpiler: new HarmonyMethod(typeof(EasyCaravanAndGo), nameof(EasyCaravanAndGo.GetGizmosTranspiler)));
+                }
+                else
+                {
+                    Log.Warning("Couldn't apply patch to remove Force leave button");
+                }
+            }
+#endif
         }
 
         public static IntVec3? TryFindExitSpot(Map map, List<Pawn> pawns, int startingTile)
@@ -663,6 +679,34 @@ namespace EasyCaravanAndGo
                     __result = null;
                 }
             }
+        }
+
+        static IEnumerable<CodeInstruction> GetGizmosTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            var code = new List<CodeInstruction>(instructions);
+            
+            bool found = false;
+            for (int i = 0; i < code.Count - 2; i++)
+            {
+                if (code[i + 0].Calls(AccessTools.PropertyGetter(typeof(Verse.AI.Group.Lord), nameof(Verse.AI.Group.Lord.CurLordToil))) &&
+                    code[i + 1].opcode == OpCodes.Isinst && code[i + 1].operand as Type == typeof(RimWorld.LordToil_PrepareCaravan_Leave) &&
+                    code[i + 2].opcode == OpCodes.Brtrue_S)
+                {
+
+                    code[i + 0] = new CodeInstruction(OpCodes.Pop);      // pop lord toil
+                    code[i + 1] = new CodeInstruction(OpCodes.Ldc_I4_1); // push true
+                                                                         // leave the branch as-is
+                    found = true;
+                    break; // patch only once
+                }
+            }
+
+            if (!found)
+            {
+                Log.Warning("Transpiler was unable to remove force caravan departure button");
+            }
+
+            return code;
         }
     }
 }

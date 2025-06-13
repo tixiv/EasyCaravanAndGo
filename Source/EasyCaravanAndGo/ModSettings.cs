@@ -25,6 +25,11 @@ namespace EasyCaravanAndGo
         public static bool loaded_enableLoadOnCaravanFix = true;
         public static bool loaded_enableGatherDownedPawnsFixes = true;
 
+#if RIMWORLD_1_6
+        public static bool disableForceCaravanDepartureButton = false;
+        public static bool loaded_disableForceCaravanDepartureButton = false;
+#endif
+
         public override void ExposeData()
         {
             base.ExposeData();
@@ -46,6 +51,14 @@ namespace EasyCaravanAndGo
                 loaded_enableLoadOnCaravanFix = enableLoadOnCaravanFix;
                 loaded_enableGatherDownedPawnsFixes = enableGatherDownedPawnsFixes;
             }
+
+#if RIMWORLD_1_6
+            Scribe_Values.Look(ref disableForceCaravanDepartureButton, nameof(disableForceCaravanDepartureButton), false);
+            if (Scribe.mode == LoadSaveMode.PostLoadInit)
+            {
+                loaded_disableForceCaravanDepartureButton = disableForceCaravanDepartureButton;
+            }
+#endif
         }
     }
 
@@ -87,9 +100,19 @@ namespace EasyCaravanAndGo
             listingStandard.CheckboxLabeled("ECAG_EnableGatherDownedPawnsFixes".Translate(), ref EasyCaravanAndGo_Settings.enableGatherDownedPawnsFixes);
             listingStandard.Label("ECAG_EnableGatherDownedPawnsFixes_desc".Translate());
 
+#if RIMWORLD_1_6
+            listingStandard.GapLine();
+            listingStandard.CheckboxLabeled("ECAG_DisableForceCaravanDepartureButton".Translate(), ref EasyCaravanAndGo_Settings.disableForceCaravanDepartureButton);
+            listingStandard.Label("ECAG_DisableForceCaravanDepartureButton_desc".Translate());
+#endif
+
             if (EasyCaravanAndGo_Settings.loaded_enableLordPatches != EasyCaravanAndGo_Settings.enableLordPatches ||
                 EasyCaravanAndGo_Settings.loaded_enableLoadOnCaravanFix != EasyCaravanAndGo_Settings.enableLoadOnCaravanFix ||
-                EasyCaravanAndGo_Settings.loaded_enableGatherDownedPawnsFixes != EasyCaravanAndGo_Settings.enableGatherDownedPawnsFixes)
+                EasyCaravanAndGo_Settings.loaded_enableGatherDownedPawnsFixes != EasyCaravanAndGo_Settings.enableGatherDownedPawnsFixes
+#if RIMWORLD_1_6
+                || EasyCaravanAndGo_Settings.loaded_disableForceCaravanDepartureButton != EasyCaravanAndGo_Settings.disableForceCaravanDepartureButton
+#endif
+                )
             {
                 listingStandard.Gap(24);
 
