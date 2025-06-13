@@ -65,13 +65,18 @@ namespace EasyCaravanAndGo
 
                 var subtype = typeof(FloatMenuOptionProvider_LoadCaravan).GetNestedTypes(BindingFlags.NonPublic).FirstOrDefault(t => t.Name.Contains("<GetOptionsFor>"));
                 if (subtype != null)
+                {
                     harmony.Patch(AccessTools.Method(subtype, "MoveNext"),
-                        // prefix: new HarmonyMethod(typeof(EasyCaravanAndGo), nameof(EasyCaravanAndGo.GetOptionsFor_Prefix)),
-                        transpiler: new HarmonyMethod(typeof(EasyCaravanAndGo), nameof(EasyCaravanAndGo.AddHumanlikeOrders_Transpiler))
-                        // postfix: new HarmonyMethod(typeof(EasyCaravanAndGo), nameof(EasyCaravanAndGo.GetOptionsFor_Postfix))
-                        );
+                        transpiler: new HarmonyMethod(typeof(EasyCaravanAndGo), nameof(EasyCaravanAndGo.AddHumanlikeOrders_Transpiler)));
+
+                    harmony.Patch(AccessTools.Method(typeof(FloatMenuMakerMap), nameof(FloatMenuMakerMap.GetOptions)),
+                        prefix: new HarmonyMethod(typeof(EasyCaravanAndGo), nameof(EasyCaravanAndGo.GetOptions_Prefix)),
+                        postfix: new HarmonyMethod(typeof(EasyCaravanAndGo), nameof(EasyCaravanAndGo.GetOptions_Postfix)));
+                }
                 else
+                {
                     Log.Warning("Couldn't apply FloatMenuOptionProvider_LoadCaravan.GetOptionsFor patch");
+                }
                 
 
 #endif                
@@ -582,7 +587,7 @@ namespace EasyCaravanAndGo
 
             if (phase != 4)
             {
-                Log.Warning("Transpiler failed to patch FloatMenuMakerMap::AddHumanlikeOrders() correctly.");
+                Log.Warning("Transpiler failed to patch float menu correctly.");
             }
         }
 
@@ -601,12 +606,12 @@ namespace EasyCaravanAndGo
 
 #elif RIMWORLD_1_6
 
-        public static bool GetOptionsFor_Prefix(ref IEnumerable<FloatMenuOption> __result, Thing clickedThing, FloatMenuContext context)
+        public static bool GetOptions_Prefix()
         {
             FloatMenuOptionTracker.Clear();
             return true;
         }
-        public static void GetOptionsFor_Postfix(ref IEnumerable<FloatMenuOption> __result, Thing clickedThing, FloatMenuContext context)
+        public static void GetOptions_Postfix(ref FloatMenuContext context)
         {
             patchOptions(context.FirstSelectedPawn);
         }
