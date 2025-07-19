@@ -3,7 +3,7 @@
 <LanguageData>
   <!-- Gizmos -->
   <ECAG_FormCaravan>Form caravan</ECAG_FormCaravan>
-  <ECAG_FormCaravan_desc>Form a caravan now that only includes this pawn.",</ECAG_FormCaravan_desc>
+  <ECAG_FormCaravan_desc>Form a caravan now that only includes this pawn.</ECAG_FormCaravan_desc>
   <ECAG_SetHitchingSpot>Set hitching spot</ECAG_SetHitchingSpot>
   <ECAG_SetHitchingSpot_desc>Set the hitching spot location for this caravan.</ECAG_SetHitchingSpot_desc>
   <ECAG_SetExitCell>Set caravan exit</ECAG_SetExitCell>
