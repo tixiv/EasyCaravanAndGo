@@ -271,8 +271,12 @@ namespace EasyCaravanAndGo
                 }
             }
             else if (EasyCaravanAndGo_Settings.enableFormCaravanButton &&
+                pawn != null && pawn.Map != null && pawn.Map.Parent != null &&
+                !pawn.Map.IsPocketMap &&
                 !pawn.NonHumanlikeOrWildMan() && pawn.IsFreeNonSlaveColonist &&
-                !CaravanFormingUtility.IsFormingCaravanOrDownedPawnToBeTakenByCaravan(pawn))
+                !MentalStateUtility.IsHavingMentalBreak(pawn) &&
+                !CaravanFormingUtility.IsFormingCaravanOrDownedPawnToBeTakenByCaravan(pawn)
+                )
             {
                 var formCaravanCommand = new Command_Action
                 {
@@ -281,18 +285,18 @@ namespace EasyCaravanAndGo
                     icon = FormCaravanIcon,
                     action = () =>
                     {
-                        if (pawn == null || pawn.MapHeld == null || pawn.MapHeld.Parent == null)
-                        {
-                            Log.Error("pawn, pawn.MapHeld or pawn.Mapheld.Parent is null. Can't form Caravan");
-                            return;
-                        }
-
                         List<Pawn> pawns = new List<Pawn> {pawn};
 
                         int startingTile = pawn.Map.Parent.Tile;
                         int destinationTile = -1; // destinationTile value of -1 will make the caravan wait on top of the colony
 
-                        var exitSpot = TryFindExitSpot(pawn.Map, pawns, startingTile);
+                        IntVec3? exitSpot = TryFindExitSpot(pawn.Map, pawns, startingTile);
+
+#if RIMWORLD_1_6             
+                        if (pawn.Map.Biome.inVacuum)
+                            exitSpot = IntVec3.Zero;
+#endif
+
                         if (exitSpot.HasValue)
                         {
                             CaravanFormingUtility.StartFormingCaravan(pawns, new List<Pawn>(), Faction.OfPlayer, new List<TransferableOneWay>(), pawn.Position, exitSpot.Value, startingTile, destinationTile);
